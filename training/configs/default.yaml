@@ -1,0 +1,38 @@
+data:
+  root: "./data/PlantVillage"
+  image_size: 256
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  severity_method: "color_segmentation"
+  num_workers: 4
+
+model:
+  backbone: "hf_hub:timm/mobilenetv5_300m.gemma3n"
+  pretrained: true
+  freeze_backbone: true
+  num_disease_classes: 38
+  num_severity_classes: 4
+  dropout: 0.3
+
+training:
+  epochs: 30
+  batch_size: 32
+  lr: 0.001
+  fine_tune_lr: 0.0001
+  fine_tune_after_epoch: 10
+  unfreeze_blocks: 3
+  loss_weight_disease: 1.0
+  loss_weight_severity: 0.5
+  early_stopping_patience: 5
+  device: "cuda"
+  seed: 42
+  output_dir: "./outputs"
+
+export:
+  onnx_opset: 17
+  onnx_output: "./outputs/model.onnx"
+  onnx_simplified: "./outputs/model_simplified.onnx"
+  ncnn_output_dir: "./outputs/ncnn"
+  pc_model_dir: "../pc/public/models"
+  mobile_assets_dir: "../mobile/app/src/main/assets"
