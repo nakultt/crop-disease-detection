@@ -2,20 +2,20 @@
  * Treatment recommendations keyed by disease class and severity level.
  */
 
-import { isHealthy } from "./labels";
+import { isHealthy } from "./manifest";
 
 const DISEASE_RECOMMENDATIONS: Record<string, string[]> = {
-  "Apple___Apple_scab": [
+  Apple___Apple_scab: [
     "Apply fungicide containing captan or myclobutanil.",
     "Rake and destroy fallen leaves in autumn.",
     "Prune trees to improve air circulation.",
   ],
-  "Apple___Black_rot": [
+  Apple___Black_rot: [
     "Remove mummified fruits and cankers.",
     "Apply fungicide during early bloom.",
     "Maintain tree vigor with proper fertilization.",
   ],
-  "Apple___Cedar_apple_rust": [
+  Apple___Cedar_apple_rust: [
     "Apply fungicide at pink bud stage.",
     "Remove nearby juniper/cedar trees if possible.",
     "Use resistant apple varieties.",
@@ -35,7 +35,7 @@ const DISEASE_RECOMMENDATIONS: Record<string, string[]> = {
     "Plant resistant hybrids.",
     "Practice crop rotation with non-host crops.",
   ],
-  "Grape___Black_rot": [
+  Grape___Black_rot: [
     "Apply mancozeb or myclobutanil fungicide.",
     "Remove mummified berries and infected canes.",
     "Prune for good air circulation.",
@@ -56,7 +56,7 @@ const DISEASE_RECOMMENDATIONS: Record<string, string[]> = {
     "Remove and destroy severely infected trees.",
     "Use certified disease-free nursery stock.",
   ],
-  "Peach___Bacterial_spot": [
+  Peach___Bacterial_spot: [
     "Apply copper-based bactericide in dormant season.",
     "Use resistant peach varieties.",
     "Avoid overhead irrigation.",
@@ -66,49 +66,49 @@ const DISEASE_RECOMMENDATIONS: Record<string, string[]> = {
     "Use disease-free seeds and transplants.",
     "Rotate crops for 2–3 years.",
   ],
-  "Potato___Early_blight": [
+  Potato___Early_blight: [
     "Apply chlorothalonil or mancozeb fungicide.",
     "Maintain proper plant nutrition.",
     "Remove and destroy infected plant debris.",
   ],
-  "Potato___Late_blight": [
+  Potato___Late_blight: [
     "Apply systemic fungicide (metalaxyl + mancozeb).",
     "Destroy infected tubers and plant debris.",
     "Use certified disease-free seed potatoes.",
     "Ensure good field drainage.",
   ],
-  "Squash___Powdery_mildew": [
+  Squash___Powdery_mildew: [
     "Apply sulfur or potassium bicarbonate fungicide.",
     "Improve air circulation between plants.",
     "Water at base of plant, avoid wetting foliage.",
   ],
-  "Strawberry___Leaf_scorch": [
+  Strawberry___Leaf_scorch: [
     "Remove and destroy infected leaves.",
     "Apply fungicide during early season.",
     "Ensure proper plant spacing.",
   ],
-  "Tomato___Bacterial_spot": [
+  Tomato___Bacterial_spot: [
     "Apply copper-based bactericide.",
     "Use disease-free seeds and transplants.",
     "Avoid working with wet plants.",
   ],
-  "Tomato___Early_blight": [
+  Tomato___Early_blight: [
     "Apply chlorothalonil or copper-based fungicide.",
     "Mulch around plants to prevent soil splash.",
     "Rotate crops – avoid same spot for 2 years.",
   ],
-  "Tomato___Late_blight": [
+  Tomato___Late_blight: [
     "Apply fungicide immediately (chlorothalonil or mancozeb).",
     "Remove and destroy all infected plant material.",
     "Do NOT compost infected plants.",
     "Avoid overhead irrigation.",
   ],
-  "Tomato___Leaf_Mold": [
+  Tomato___Leaf_Mold: [
     "Improve greenhouse ventilation.",
     "Apply fungicide if severe.",
     "Reduce humidity around plants.",
   ],
-  "Tomato___Septoria_leaf_spot": [
+  Tomato___Septoria_leaf_spot: [
     "Apply chlorothalonil or mancozeb fungicide.",
     "Remove lower infected leaves.",
     "Avoid overhead watering.",
@@ -118,18 +118,18 @@ const DISEASE_RECOMMENDATIONS: Record<string, string[]> = {
     "Spray plants with strong water jet to dislodge mites.",
     "Introduce predatory mites as biological control.",
   ],
-  "Tomato___Target_Spot": [
+  Tomato___Target_Spot: [
     "Apply chlorothalonil fungicide.",
     "Improve air circulation.",
     "Remove infected lower leaves.",
   ],
-  "Tomato___Tomato_Yellow_Leaf_Curl_Virus": [
+  Tomato___Tomato_Yellow_Leaf_Curl_Virus: [
     "No chemical cure – manage whitefly vector.",
     "Use insecticide for whitefly control.",
     "Remove and destroy infected plants early.",
     "Use resistant tomato varieties.",
   ],
-  "Tomato___Tomato_mosaic_virus": [
+  Tomato___Tomato_mosaic_virus: [
     "No chemical cure available.",
     "Remove and destroy infected plants.",
     "Disinfect tools between plants.",
@@ -171,11 +171,14 @@ export interface Recommendation {
 
 export function getRecommendations(
   diseaseClass: string,
-  severity: string
+  severity: string,
 ): Recommendation[] {
   if (isHealthy(diseaseClass)) {
     return [
-      { text: "Plant appears healthy! Continue regular care.", urgency: "info" },
+      {
+        text: "Plant appears healthy! Continue regular care.",
+        urgency: "info",
+      },
       {
         text: "Maintain proper watering and fertilization schedule.",
         urgency: "info",

@@ -1,3 +1,50 @@
 <resources>
-    <string name="app_name">mobile</string>
+    <string name="app_name">PlantGuard</string>
+
+    <string name="hero_title">Diagnose a plant disease, and see the evidence</string>
+    <string name="hero_subtitle">Photograph a leaf to identify one of 38 conditions across 14 crops, estimate how far the infection has spread, and view the regions that drove the decision.</string>
+
+    <string name="intake_title">Add a leaf photo</string>
+    <string name="intake_subtitle">JPEG, PNG or WebP</string>
+    <string name="action_gallery">Gallery</string>
+    <string name="action_camera">Camera</string>
+    <string name="action_start_over">Start over</string>
+
+    <string name="status_loading_model">Loading model…</string>
+    <string name="status_analysing">Analysing…</string>
+
+    <string name="demo_banner_title">Demo model — predictions are not meaningful</string>
+    <string name="demo_banner_body">This model was exported with --demo, so its classification heads are untrained and every result is effectively random. Train a model and re-export before reading anything into a diagnosis.</string>
+
+    <string name="fact_backbone">Backbone</string>
+    <string name="fact_size">Size</string>
+    <string name="fact_explanation">Explanation</string>
+    <string name="cam_exact">Exact CAM</string>
+    <string name="cam_approximate">Approximate CAM</string>
+    <string name="fact_accuracy">Test accuracy %1$.1f%% over %2$d held-out images</string>
+
+    <string name="heatmap_title">Where the model looked</string>
+    <string name="heatmap_caption_exact">Exact class activation map for %1$s</string>
+    <string name="heatmap_caption_approx">Approximate activation map for %1$s</string>
+    <string name="heatmap_overlay">Overlay</string>
+    <string name="heatmap_colour_scale">Colour scale</string>
+
+    <string name="diagnosis_title">Diagnosis</string>
+    <string name="label_confidence">confidence</string>
+    <string name="confidence_moderate">Moderate confidence — check the runners-up below before acting.</string>
+    <string name="confidence_low">Low confidence. The model is not separating these classes well on this image; try a sharper, closer, better-lit photo of a single leaf.</string>
+    <string name="candidates_title">All candidates</string>
+    <string name="candidates_hint">Select one to see the heatmap for that class.</string>
+    <string name="inference_time">Analysed on-device in %1$d ms.</string>
+
+    <string name="severity_title">Infection severity</string>
+    <string name="severity_healthy">No disease detected, so there is no infection severity to report.</string>
+    <string name="severity_caveat">Severity labels are derived from colour segmentation, not agronomist annotation. Treat this as an indication, not a measurement.</string>
+
+    <string name="advice_title">Suggested treatment</string>
+    <string name="advice_title_healthy">Keeping it healthy</string>
+    <string name="advice_untrained_caveat">Shown for completeness only. The current model is untrained, so the diagnosis these steps respond to is not real.</string>
+    <string name="advice_disclaimer">General guidance only. Confirm the diagnosis and any chemical treatment with a local agricultural extension service before applying it — product availability, dosage and regulations vary by region.</string>
+
+    <string name="privacy_note">Photographs are analysed on this device and never uploaded.</string>
 </resources>

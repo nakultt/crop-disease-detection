@@ -21,12 +21,12 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from .dataset import create_dataloaders
-from .model import MultiTaskMobileNetV5
+from .model import MultiTaskPlantModel
 from .utils import ensure_dir, get_device, load_config, set_seed
 
 
 def train_one_epoch(
-    model: MultiTaskMobileNetV5,
+    model: MultiTaskPlantModel,
     loader: torch.utils.data.DataLoader,
     optimizer: torch.optim.Optimizer,
     disease_criterion: nn.Module,
@@ -34,9 +34,17 @@ def train_one_epoch(
     device: torch.device,
     w_disease: float = 1.0,
     w_severity: float = 0.5,
+    scaler: torch.amp.GradScaler | None = None,
 ) -> dict[str, float]:
-    """Train for one epoch."""
+    """Train for one epoch.
+
+    When ``scaler`` is supplied, the forward pass runs under ``autocast`` in
+    bfloat16/float16. On an Ada-class GPU that roughly halves epoch time and
+    frees enough memory to keep the batch size up, which matters when a full
+    run is 30 epochs over 54k images.
+    """
     model.train()
+    use_amp = scaler is not None and device.type == "cuda"
 
     total_loss = 0.0
     total_disease_loss = 0.0
@@ -47,22 +55,25 @@ def train_one_epoch(
 
     pbar = tqdm(loader, desc="Training", leave=False)
     for batch in pbar:
-        images = batch["image"].to(device)
-        disease_labels = batch["disease_label"].to(device)
-        severity_labels = batch["severity_label"].to(device)
+        images = batch["image"].to(device, non_blocking=True)
+        disease_labels = batch["disease_label"].to(device, non_blocking=True)
+        severity_labels = batch["severity_label"].to(device, non_blocking=True)
 
-        # Forward pass
-        disease_logits, severity_logits = model(images)
+        optimizer.zero_grad(set_to_none=True)
 
-        # Compute losses
-        d_loss = disease_criterion(disease_logits, disease_labels)
-        s_loss = severity_criterion(severity_logits, severity_labels)
-        loss = w_disease * d_loss + w_severity * s_loss
+        with torch.amp.autocast("cuda", enabled=use_amp):
+            disease_logits, severity_logits = model(images)
+            d_loss = disease_criterion(disease_logits, disease_labels)
+            s_loss = severity_criterion(severity_logits, severity_labels)
+            loss = w_disease * d_loss + w_severity * s_loss
 
-        # Backward pass
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        if use_amp:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
 
         # Track metrics
         batch_size = images.size(0)
@@ -93,7 +104,7 @@ def train_one_epoch(
 
 @torch.no_grad()
 def validate(
-    model: MultiTaskMobileNetV5,
+    model: MultiTaskPlantModel,
     loader: torch.utils.data.DataLoader,
     disease_criterion: nn.Module,
     severity_criterion: nn.Module,
@@ -112,15 +123,15 @@ def validate(
     total_samples = 0
 
     for batch in tqdm(loader, desc="Validating", leave=False):
-        images = batch["image"].to(device)
-        disease_labels = batch["disease_label"].to(device)
-        severity_labels = batch["severity_label"].to(device)
+        images = batch["image"].to(device, non_blocking=True)
+        disease_labels = batch["disease_label"].to(device, non_blocking=True)
+        severity_labels = batch["severity_label"].to(device, non_blocking=True)
 
-        disease_logits, severity_logits = model(images)
-
-        d_loss = disease_criterion(disease_logits, disease_labels)
-        s_loss = severity_criterion(severity_logits, severity_labels)
-        loss = w_disease * d_loss + w_severity * s_loss
+        with torch.amp.autocast("cuda", enabled=device.type == "cuda"):
+            disease_logits, severity_logits = model(images)
+            d_loss = disease_criterion(disease_logits, disease_labels)
+            s_loss = severity_criterion(severity_logits, severity_labels)
+            loss = w_disease * d_loss + w_severity * s_loss
 
         batch_size = images.size(0)
         total_loss += loss.item() * batch_size
@@ -178,16 +189,24 @@ def train(config: dict, epochs_override: int | None = None, subset: int | None =
     print("BUILDING MODEL")
     print("=" * 60)
 
-    model = MultiTaskMobileNetV5(
+    model = MultiTaskPlantModel(
         backbone_name=model_cfg["backbone"],
         pretrained=model_cfg["pretrained"],
         num_disease_classes=model_cfg["num_disease_classes"],
         num_severity_classes=model_cfg["num_severity_classes"],
         dropout=model_cfg["dropout"],
         freeze_backbone=model_cfg["freeze_backbone"],
+        image_size=data_cfg["image_size"],
     )
     print(model.summary())
     model = model.to(device)
+
+    # Fixed 256x256 inputs mean cuDNN can pick its best kernels once and reuse
+    # them for the whole run instead of re-benchmarking every epoch.
+    if device.type == "cuda":
+        torch.backends.cudnn.benchmark = True
+
+    scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
 
     # ── Loss functions ──
     disease_criterion = nn.CrossEntropyLoss()
@@ -218,20 +237,17 @@ def train(config: dict, epochs_override: int | None = None, subset: int | None =
 
         # ── Set up optimizer (recreate after phase transition) ──
         if epoch == 1 or epoch == fine_tune_after + 1:
-            param_groups = model.get_trainable_params()
-
             if epoch <= fine_tune_after:
-                # Phase 1: Train heads only
-                lr = train_cfg["lr"]
-                for pg in param_groups:
-                    pg["lr"] = lr
+                # Phase 1: heads only, at the base LR.
+                param_groups = model.param_groups(
+                    backbone_lr=train_cfg["lr"], head_lr=train_cfg["lr"]
+                )
             else:
-                # Phase 2: Fine-tune with differential LR
-                for pg in param_groups:
-                    if pg["name"] == "backbone":
-                        pg["lr"] = train_cfg["fine_tune_lr"]
-                    else:
-                        pg["lr"] = train_cfg["fine_tune_lr"] * 10  # Heads get 10x backbone LR
+                # Phase 2: differential LR -- heads move 10x faster than the backbone.
+                param_groups = model.param_groups(
+                    backbone_lr=train_cfg["fine_tune_lr"],
+                    head_lr=train_cfg["fine_tune_lr"] * 10,
+                )
 
             optimizer = torch.optim.AdamW(param_groups, weight_decay=1e-4)
             print(f"Optimizer reset: {[{pg['name']: pg['lr']} for pg in param_groups]}")
@@ -245,6 +261,7 @@ def train(config: dict, epochs_override: int | None = None, subset: int | None =
             disease_criterion, severity_criterion, device,
             w_disease=train_cfg["loss_weight_disease"],
             w_severity=train_cfg["loss_weight_severity"],
+            scaler=scaler,
         )
 
         val_metrics = validate(

@@ -1,3 +1,17 @@
+# Default configuration: a model that actually fits in a browser and an APK.
+#
+# `backbone` accepts either a preset key (mobile / balanced / large / server,
+# see src/model.py::BACKBONE_PRESETS) or any timm model name.
+#
+#   preset    params   fp32 ONNX   deployable to
+#   -------   ------   ---------   ----------------------------
+#   mobile      3.8M      ~15 MB   web + android + server
+#   balanced    5.3M      ~21 MB   web + android + server
+#   large       9.7M      ~39 MB   android + server (over web budget)
+#   server      300M    ~1170 MB   server only
+#
+# Budgets are enforced at export time: 32 MB web, 48 MB android.
+
 data:
   root: "./data/PlantVillage"
   image_size: 256
@@ -5,19 +19,26 @@ data:
   val_split: 0.15
   test_split: 0.15
   severity_method: "color_segmentation"
-  num_workers: 4
+  # JPEG decode + augmentation is the bottleneck, not the GPU. Each worker is a
+  # separate process with its own torch/cv2 import, so more is not free: 6 keeps
+  # the GPU fed on this machine without exhausting RAM.
+  num_workers: 6
 
 model:
-  backbone: "hf_hub:timm/mobilenetv5_300m.gemma3n"
+  backbone: "mobile"
   pretrained: true
   freeze_backbone: true
   num_disease_classes: 38
   num_severity_classes: 4
+  # Dropout must stay between the pooled features and the Linear heads --
+  # moving it breaks the exact-CAM identity the exporter depends on.
   dropout: 0.3
 
 training:
   epochs: 30
-  batch_size: 32
+  # 64 fits comfortably in 8 GB with a 3.8M-param backbone at 256px, and
+  # keeps the GPU fed better than 32 does.
+  batch_size: 64
   lr: 0.001
   fine_tune_lr: 0.0001
   fine_tune_after_epoch: 10
@@ -32,7 +53,5 @@ training:
 export:
   onnx_opset: 17
   onnx_output: "./outputs/model.onnx"
-  onnx_simplified: "./outputs/model_simplified.onnx"
-  ncnn_output_dir: "./outputs/ncnn"
   pc_model_dir: "../pc/public/models"
   mobile_assets_dir: "../mobile/app/src/main/assets"

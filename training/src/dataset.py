@@ -274,6 +274,29 @@ class PlantDiseaseDataset(Dataset):
 # ─── Data Loaders ─────────────────────────────────────────────────────────────
 
 
+# A class needs at least this many samples to appear in both sides of a split.
+MIN_PER_CLASS = 4
+
+
+def _stratify_or_none(labels: list[int]) -> list[int] | None:
+    """Return `labels` for stratification, or None when it is not possible.
+
+    `train_test_split` raises if any class has a single member. Degrading to an
+    unstratified split keeps a small debug run working instead of aborting; on
+    the full dataset every class has hundreds of members, so this never trips.
+    """
+    counts: dict[int, int] = {}
+    for label in labels:
+        counts[label] = counts.get(label, 0) + 1
+    if counts and min(counts.values()) < 2:
+        print(
+            "  note: some classes have a single sample, so this split is not "
+            "stratified. Expected only for very small --subset runs."
+        )
+        return None
+    return labels
+
+
 def create_dataloaders(
     data_root: str | Path,
     image_size: int = 256,
@@ -335,23 +358,45 @@ def create_dataloaders(
 
     # Subset for quick testing
     if subset and subset < len(all_paths):
-        indices = np.random.RandomState(seed).choice(
-            len(all_paths), size=subset, replace=False
-        )
+        # Sample per class rather than uniformly at random. A uniform draw of a
+        # few hundred images across 38 classes leaves some classes with a single
+        # member, and a stratified split cannot then place that class in both
+        # halves -- so `--subset` used to crash instead of running a quick test.
+        rng = np.random.RandomState(seed)
+        by_class: dict[int, list[int]] = {}
+        for index, label in enumerate(all_disease_labels):
+            by_class.setdefault(label, []).append(index)
+
+        # Every class needs at least MIN_PER_CLASS so both splits can hold one.
+        per_class = max(MIN_PER_CLASS, subset // max(1, len(by_class)))
+        indices: list[int] = []
+        for label_indices in by_class.values():
+            take = min(per_class, len(label_indices))
+            indices.extend(
+                rng.choice(label_indices, size=take, replace=False).tolist()
+            )
+
+        rng.shuffle(indices)
         all_paths = [all_paths[i] for i in indices]
         all_disease_labels = [all_disease_labels[i] for i in indices]
         all_severity_labels = [all_severity_labels[i] for i in indices]
-        print(f"Using subset of {subset} images")
+        print(
+            f"Using a stratified subset of {len(all_paths)} images "
+            f"({per_class} per class)"
+        )
 
-    # Stratified split (stratify by disease label)
-    # First split: train vs (val + test)
+    # Stratified split (by disease label), so every class keeps its proportion
+    # in train/val/test. Falls back to an unstratified split if any class is too
+    # small to appear on both sides.
+    stratify_all = _stratify_or_none(all_disease_labels)
+
     val_test_ratio = val_split + test_split
     train_paths, valtest_paths, train_disease, valtest_disease, train_severity, valtest_severity = train_test_split(
         all_paths,
         all_disease_labels,
         all_severity_labels,
         test_size=val_test_ratio,
-        stratify=all_disease_labels,
+        stratify=stratify_all,
         random_state=seed,
     )
 
@@ -362,7 +407,7 @@ def create_dataloaders(
         valtest_disease,
         valtest_severity,
         test_size=(1 - val_ratio_of_valtest),
-        stratify=valtest_disease,
+        stratify=_stratify_or_none(valtest_disease),
         random_state=seed,
     )
 
@@ -389,6 +434,14 @@ def create_dataloaders(
         shuffle=True,
         num_workers=num_workers,
         pin_memory=True,
+        # Windows respawns workers each epoch, re-importing torch and cv2
+        # every time. Keeping them alive removes that cost per epoch.
+        persistent_workers=num_workers > 0,
+        # Queue depth multiplies: workers x prefetch_factor x batch_size images
+        # are resident at once. At 8x4x64 that is 2048 decoded 256x256 float32
+        # images (~1.6 GB) on top of each worker's own interpreter, which pushed
+        # a 32 GB machine to 80% memory. 2 keeps the GPU fed without the bloat.
+        prefetch_factor=2 if num_workers > 0 else None,
         drop_last=True,
     )
     val_loader = DataLoader(
@@ -397,6 +450,10 @@ def create_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
+        # Windows respawns workers each epoch, re-importing torch and cv2
+        # every time. Keeping them alive removes that cost per epoch.
+        persistent_workers=num_workers > 0,
+        prefetch_factor=4 if num_workers > 0 else None,
     )
     test_loader = DataLoader(
         test_dataset,
@@ -404,6 +461,10 @@ def create_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
+        # Windows respawns workers each epoch, re-importing torch and cv2
+        # every time. Keeping them alive removes that cost per epoch.
+        persistent_workers=num_workers > 0,
+        prefetch_factor=4 if num_workers > 0 else None,
     )
 
     info = {

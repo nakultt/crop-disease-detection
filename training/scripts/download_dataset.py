@@ -8,9 +8,15 @@ Usage:
 
 import argparse
 import shutil
+import sys
 from pathlib import Path
 
 import kagglehub
+
+# A Windows console is cp1252 and cannot encode the check marks below.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 
 DATASET_SLUG = "abdallahalidev/plantvillage-dataset"

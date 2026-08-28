@@ -2,10 +2,37 @@
 Utility functions, label mappings, and treatment recommendations.
 """
 
+import sys
 from pathlib import Path
 from typing import Any
 
 import torch
+
+
+def _force_utf8_stdout() -> None:
+    """Make stdout/stderr accept non-ASCII on any platform.
+
+    A Windows console defaults to cp1252, which cannot encode the box-drawing
+    characters, arrows and check marks this pipeline prints. Without this, a
+    training run dies with `UnicodeEncodeError` partway through -- discarding
+    however many GPU-hours it had accumulated -- because of a progress banner.
+
+    `errors="replace"` means a stray glyph degrades to '?' rather than raising.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                # Redirected to a pipe that does not support reconfiguration;
+                # printing ASCII still works, so this is not worth failing over.
+                pass
+
+
+# Every entry point imports this module, so applying it here covers the CLI,
+# `python -m src.train`, and the test suite alike.
+_force_utf8_stdout()
 
 # ─── PlantVillage 38-class disease label mapping ─────────────────────────────
 DISEASE_CLASSES = [

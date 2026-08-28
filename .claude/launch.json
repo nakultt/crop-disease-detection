@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "plantguard-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "pc", "exec", "--", "next", "dev", "pc", "--port", "3111"],
+      "port": 3111
+    }
+  ]
+}

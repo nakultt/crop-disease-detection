@@ -1,120 +1,276 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { renderHeatmapOverlay } from "../lib/gradcam";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  COLORMAP_NAMES,
+  type ColormapName,
+  colormapLut,
+  describeHotspot,
+  normalizeCam,
+  renderOverlay,
+} from "../lib/cam";
+
+type ViewMode = "overlay" | "split";
 
 interface HeatmapViewerProps {
-  imageUrl: string;
+  /** The preprocessed square input — what the model actually saw. */
+  source: HTMLCanvasElement;
+  /** Raw CAM grid for the class being explained. */
+  cam: Float32Array;
+  gridH: number;
+  gridW: number;
+  /** Name of the class this heatmap explains, for the caption. */
+  explaining: string;
+  exact: boolean;
 }
 
-export default function HeatmapViewer({ imageUrl }: HeatmapViewerProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [opacity, setOpacity] = useState(0.5);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const imageRef = useRef<HTMLImageElement | null>(null);
+const CANVAS_SIZE = 512;
+
+/**
+ * Shows where the model looked.
+ *
+ * The heatmap is a class activation map read straight out of the ONNX graph, so
+ * it reflects the actual evidence behind the logit rather than a colour
+ * heuristic applied to the photograph.
+ */
+export default function HeatmapViewer({
+  source,
+  cam,
+  gridH,
+  gridW,
+  explaining,
+  exact,
+}: HeatmapViewerProps) {
+  const overlayRef = useRef<HTMLCanvasElement>(null);
+  const plainRef = useRef<HTMLCanvasElement>(null);
+
+  const [opacity, setOpacity] = useState(0.6);
+  const [colormap, setColormap] = useState<ColormapName>("inferno");
+  const [mode, setMode] = useState<ViewMode>("overlay");
+
+  const normalized = useMemo(() => normalizeCam(cam), [cam]);
+  const description = useMemo(
+    () => describeHotspot(normalized, gridH, gridW),
+    [normalized, gridH, gridW],
+  );
 
   useEffect(() => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      imageRef.current = img;
-      setImageLoaded(true);
-    };
-    img.src = imageUrl;
-  }, [imageUrl]);
+    const canvas = overlayRef.current;
+    if (!canvas) return;
+    renderOverlay(canvas, source, normalized, gridH, gridW, colormap, opacity);
+  }, [source, normalized, gridH, gridW, colormap, opacity]);
 
   useEffect(() => {
-    if (!imageLoaded || !canvasRef.current || !imageRef.current) return;
-
-    const canvas = canvasRef.current;
-    canvas.width = 256;
-    canvas.height = 256;
-
-    renderHeatmapOverlay(canvas, imageRef.current, opacity);
-  }, [imageLoaded, opacity]);
+    const canvas = plainRef.current;
+    if (!canvas || mode !== "split") return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  }, [source, mode]);
 
   return (
-    <div className="glass-card animate-fade-in animate-delay-2" style={{ padding: "24px" }} id="heatmap-viewer">
-      <p className="section-heading">Grad-CAM Heatmap</p>
-      <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "16px" }}>
-        Highlighted regions indicate areas influencing the prediction
-      </p>
-
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: "12px",
-        marginBottom: "16px",
-      }}>
-        {/* Original Image */}
-        <div>
-          <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "6px", textAlign: "center" }}>
-            Original
+    <section className="card card-pad" aria-labelledby="heatmap-heading">
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <h2
+            id="heatmap-heading"
+            className="label"
+            style={{ marginBottom: 3 }}
+          >
+            Where the model looked
+          </h2>
+          <p className="dim" style={{ fontSize: 12 }}>
+            {exact
+              ? "Exact class activation map"
+              : "Approximate activation map"}{" "}
+            for{" "}
+            <strong style={{ color: "var(--text-2)", fontWeight: 560 }}>
+              {explaining}
+            </strong>
           </p>
-          <div className="heatmap-container" style={{ aspectRatio: "1", overflow: "hidden" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt="Original leaf"
-              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "12px" }}
-            />
-          </div>
         </div>
 
-        {/* Heatmap Overlay */}
-        <div>
-          <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "6px", textAlign: "center" }}>
-            Heatmap Overlay
-          </p>
-          <div className="heatmap-container" style={{ aspectRatio: "1", overflow: "hidden" }}>
+        <fieldset
+          className="segmented"
+          style={{ marginLeft: "auto", border: 0, padding: 2, margin: 0 }}
+        >
+          <legend className="sr-only">View mode</legend>
+          {(["overlay", "split"] as ViewMode[]).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={mode === value}
+              onClick={() => setMode(value)}
+            >
+              {value === "overlay" ? "Overlay" : "Side by side"}
+            </button>
+          ))}
+        </fieldset>
+      </header>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: mode === "split" ? "1fr 1fr" : "1fr",
+          gap: 10,
+        }}
+      >
+        {mode === "split" && (
+          <figure style={{ margin: 0 }}>
             <canvas
-              ref={canvasRef}
-              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "12px" }}
+              ref={plainRef}
+              width={CANVAS_SIZE}
+              height={CANVAS_SIZE}
+              aria-label="The leaf photograph as the model received it, without a heatmap."
+              style={canvasStyle}
             />
-          </div>
+            <figcaption className="dim" style={captionStyle}>
+              Model input
+            </figcaption>
+          </figure>
+        )}
+
+        <figure style={{ margin: 0 }}>
+          <canvas
+            ref={overlayRef}
+            width={CANVAS_SIZE}
+            height={CANVAS_SIZE}
+            role="img"
+            aria-label={`Heatmap over the leaf photograph. ${description}`}
+            style={canvasStyle}
+          />
+          <figcaption className="dim" style={captionStyle}>
+            {mode === "split" ? "Activation overlay" : description}
+          </figcaption>
+        </figure>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+          marginTop: 14,
+        }}
+      >
+        <div style={{ flex: "1 1 200px", minWidth: 160 }}>
+          <label
+            htmlFor="heatmap-opacity"
+            className="label"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: 4,
+            }}
+          >
+            <span>Overlay</span>
+            <output className="tnum" htmlFor="heatmap-opacity">
+              {Math.round(opacity * 100)}%
+            </output>
+          </label>
+          <input
+            id="heatmap-opacity"
+            className="range"
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={opacity}
+            onChange={(event) => setOpacity(Number(event.target.value))}
+          />
         </div>
+
+        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className="label" style={{ marginBottom: 5 }}>
+            Colour scale
+          </legend>
+          <div className="segmented">
+            {COLORMAP_NAMES.map((name) => (
+              <button
+                key={name}
+                type="button"
+                aria-pressed={colormap === name}
+                onClick={() => setColormap(name)}
+                style={{ textTransform: "capitalize" }}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </fieldset>
       </div>
 
-      {/* Opacity Slider */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-          Opacity
-        </span>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.05"
-          value={opacity}
-          onChange={(e) => setOpacity(Number.parseFloat(e.target.value))}
-          className="heatmap-slider"
-          style={{ flex: 1 }}
-          id="heatmap-opacity-slider"
-        />
-        <span style={{ fontSize: "0.75rem", color: "var(--text-accent)", fontWeight: 600, minWidth: "36px" }}>
-          {Math.round(opacity * 100)}%
-        </span>
-      </div>
+      <ScaleLegend colormap={colormap} />
+    </section>
+  );
+}
 
-      {/* Legend */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "4px",
-        marginTop: "12px",
-        fontSize: "0.7rem",
-        color: "var(--text-muted)",
-      }}>
-        <span>Low</span>
-        <div style={{
-          width: "120px",
-          height: "8px",
-          borderRadius: "4px",
-          background: "linear-gradient(90deg, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000)",
-        }} />
-        <span>High</span>
+const canvasStyle: React.CSSProperties = {
+  width: "100%",
+  height: "auto",
+  aspectRatio: "1 / 1",
+  display: "block",
+  borderRadius: "var(--radius-md)",
+  background: "var(--surface-2)",
+};
+
+const captionStyle: React.CSSProperties = {
+  fontSize: 12,
+  marginTop: 7,
+  textAlign: "center",
+};
+
+/** A gradient bar so the colours are readable as values, not decoration. */
+function ScaleLegend({ colormap }: { colormap: ColormapName }) {
+  const gradient = useMemo(() => {
+    // Sample the LUT at 11 stops — enough to reproduce the ramp faithfully in CSS.
+    const stops: string[] = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      stops.push(`${sampleCss(colormap, t)} ${t * 100}%`);
+    }
+    return `linear-gradient(90deg, ${stops.join(", ")})`;
+  }, [colormap]);
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div
+        aria-hidden="true"
+        style={{
+          height: 8,
+          borderRadius: "var(--radius-full)",
+          background: gradient,
+          border: "1px solid var(--border)",
+        }}
+      />
+      <div
+        className="dim"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 11,
+          marginTop: 4,
+        }}
+      >
+        <span>Little influence</span>
+        <span>Strong influence on this prediction</span>
       </div>
     </div>
   );
+}
+
+function sampleCss(colormap: ColormapName, t: number): string {
+  const lut = colormapLut(colormap);
+  const i = Math.round(t * 255) * 3;
+  return `rgb(${lut[i]} ${lut[i + 1]} ${lut[i + 2]})`;
 }

@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PlantGuard — web app
 
-## Getting Started
-
-First, run the development server:
+Next.js 16 + React 19. Runs the disease model entirely in the browser via ONNX
+Runtime Web; leaf photographs never leave the device.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
+npm test           # 56 unit tests
+npm run lint       # biome check
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app needs a model in `public/models/`. Produce one from `training/`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cd ../training && uv run python main.py export --demo
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Without it the page renders a setup message naming the exact command — it does
+not crash, and the upload control is disabled and removed from the tab order.
 
-## Learn More
+## How it works
 
-To learn more about Next.js, take a look at the following resources:
+```
+model.json  ──▶ manifest.ts   validate, then drive everything from it
+model.onnx  ──▶ inference.ts  streaming download ──▶ ORT session ──▶ predict()
+                     │
+                     ├─ logits ──▶ DiagnosisCard, SeverityGauge
+                     └─ CAM cube ─▶ cam.ts ──▶ HeatmapViewer
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Nothing is hardcoded.** Class lists, input size, normalisation constants and
+output names all come from `model.json`, so re-exporting with a different
+backbone or label set needs no code change here. A malformed manifest fails
+loudly rather than silently shifting every logit.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### The heatmap is real
 
-## Deploy on Vercel
+The ONNX graph emits a class activation cube (`[1, 38, h, w]`) alongside its
+logits, so the heatmap is derived from the model's own arithmetic rather than
+from colour heuristics applied to the photo. See the derivation in
+[`../docs/MODEL_CONTRACT.md`](../docs/MODEL_CONTRACT.md).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The **whole cube** is retained client-side (~10 KB), so selecting a runner-up in
+the candidates list shows *that class's* evidence without re-running the model.
+Showing the winner's map for every selection would quietly make the explanation
+a lie.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Colormaps are Inferno, Viridis and Magma — all perceptually uniform. JET is
+deliberately absent: its bands invent edges that read as structure in the data.
+
+## Layout
+
+| path | role |
+| --- | --- |
+| `lib/manifest.ts` | Manifest types, validation, class-name formatting |
+| `lib/inference.ts` | ORT session, streaming load, preprocessing, `predict()` |
+| `lib/cam.ts` | Normalise, bilinear upscale, colormaps, compositing |
+| `lib/recommendations.ts` | Treatment table (mirrored in the Android app) |
+| `components/HeatmapViewer.tsx` | Overlay / side-by-side, opacity, colormap |
+| `components/DiagnosisCard.tsx` | Top-1 + candidates, confidence warnings |
+| `components/SeverityGauge.tsx` | SVG dial + per-level distribution |
+| `components/ModelStatus.tsx` | Provenance, download progress, demo banner |
+
+## Notes worth knowing
+
+- **Cross-origin isolation.** `next.config.ts` sends COOP/COEP over the whole
+  document so `SharedArrayBuffer` is available and WASM can use 4 threads.
+  `inference.ts` reads `crossOriginIsolated` at runtime and falls back to a
+  single thread where it doesn't take effect. This is only safe because every
+  asset is same-origin — adding a third-party script, font or image will need a
+  `crossorigin` attribute and CORP headers on the remote host.
+- **Preprocessing matches training**: short-side resize then centre-crop.
+  Squashing a non-square photo into a square distorts leaf geometry and
+  measurably shifts predictions.
+- **Confidence needs margin.** A result is only presented as confident when
+  top-1 ≥ 85% *and* it leads the runner-up by ≥ 30 points. 55% against a 45%
+  runner-up is a coin toss, not a diagnosis.
+- **Untrained models are labelled.** When `model.json` says `trained: false`,
+  a banner states predictions are not meaningful and the treatment panel says
+  it is shown for completeness only.
+- **Accessibility** is a requirement, not a pass: full keyboard path, visible
+  focus rings, `prefers-reduced-motion` honoured, severity encoded by label as
+  well as colour, and the heatmap canvas carries an `aria-label` describing
+  the highlighted region in words.
+
+## Tests
+
+`npm test` covers the CAM maths (ReLU + normalise, bilinear upscale, colormap
+LUTs, hotspot description) and manifest validation — the same properties
+`training/tests/` pins on the export side.

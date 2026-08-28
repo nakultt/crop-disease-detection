@@ -1,153 +1,268 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SEVERITY_COLORS } from "../lib/labels";
+import type { ClassScore } from "../lib/inference";
 
 interface SeverityGaugeProps {
   level: string;
-  confidence: number;
-  distribution: Array<{ level: string; confidence: number }>;
+  range: string;
+  probability: number;
+  distribution: ClassScore[];
+  /** Severity is meaningless for a healthy leaf; say so instead of drawing a dial. */
+  healthy: boolean;
 }
 
-export default function SeverityGauge({ level, confidence, distribution }: SeverityGaugeProps) {
-  const [animated, setAnimated] = useState(false);
+const ARC_START = -100;
+const ARC_END = 100;
+const RADIUS = 74;
+const CENTER_X = 100;
+const CENTER_Y = 92;
 
+/**
+ * Severity as a dial, with the level always spelled out.
+ *
+ * Colour alone would fail for a colour-blind reader and in greyscale print, so
+ * the label, the numeric range and the needle position all carry the value.
+ */
+export default function SeverityGauge({
+  level,
+  range,
+  probability,
+  distribution,
+  healthy,
+}: SeverityGaugeProps) {
+  const levels = distribution.map((d) => d.className);
+  const index = Math.max(0, levels.indexOf(level));
+
+  // Interpolate across bins so the needle reflects the whole distribution
+  // rather than snapping between four fixed positions.
+  const expected = distribution.reduce(
+    (sum, d, i) => sum + i * d.probability,
+    0,
+  );
+  const fraction = levels.length > 1 ? expected / (levels.length - 1) : 0;
+  const targetAngle = ARC_START + (ARC_END - ARC_START) * fraction;
+
+  // Animate from rest so the needle sweeps in rather than appearing placed.
+  const [angle, setAngle] = useState(ARC_START);
   useEffect(() => {
-    const timer = setTimeout(() => setAnimated(true), 100);
-    return () => clearTimeout(timer);
-  }, []);
+    const frame = requestAnimationFrame(() => setAngle(targetAngle));
+    return () => cancelAnimationFrame(frame);
+  }, [targetAngle]);
 
-  // Map severity to angle (0 = left, 180 = right)
-  const levelAngles: Record<string, number> = {
-    Mild: 22.5,
-    Moderate: 67.5,
-    Severe: 112.5,
-    Critical: 157.5,
-  };
-
-  const needleAngle = animated ? (levelAngles[level] ?? 90) : 0;
-  const color = SEVERITY_COLORS[level] ?? "#fff";
-
-  // SVG arc parameters
-  const cx = 100;
-  const cy = 95;
-  const r = 70;
-
-  // Create arc segments for each severity level
-  const segments = [
-    { label: "Mild", startAngle: 180, endAngle: 225, color: SEVERITY_COLORS.Mild },
-    { label: "Moderate", startAngle: 225, endAngle: 270, color: SEVERITY_COLORS.Moderate },
-    { label: "Severe", startAngle: 270, endAngle: 315, color: SEVERITY_COLORS.Severe },
-    { label: "Critical", startAngle: 315, endAngle: 360, color: SEVERITY_COLORS.Critical },
-  ];
-
-  function arcPath(startDeg: number, endDeg: number, radius: number): string {
-    const startRad = (startDeg * Math.PI) / 180;
-    const endRad = (endDeg * Math.PI) / 180;
-    const x1 = cx + radius * Math.cos(startRad);
-    const y1 = cy + radius * Math.sin(startRad);
-    const x2 = cx + radius * Math.cos(endRad);
-    const y2 = cy + radius * Math.sin(endRad);
-    const largeArc = endDeg - startDeg > 180 ? 1 : 0;
-    return `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`;
+  if (healthy) {
+    return (
+      <section className="card card-pad" aria-labelledby="severity-heading">
+        <h2 id="severity-heading" className="label">
+          Severity
+        </h2>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            marginTop: 12,
+            padding: "12px 14px",
+            borderRadius: "var(--radius-md)",
+            background: "var(--mild-soft)",
+            color: "var(--mild)",
+          }}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{ flex: "none" }}
+          >
+            <circle cx="10" cy="10" r="7.5" />
+            <path d="m6.5 10.2 2.4 2.3 4.6-4.8" />
+          </svg>
+          <p style={{ fontSize: 13.5, color: "var(--text)" }}>
+            No disease detected, so there is no infection severity to report.
+          </p>
+        </div>
+      </section>
+    );
   }
 
   return (
-    <div className="glass-card animate-fade-in animate-delay-1" style={{ padding: "24px" }} id="severity-gauge">
-      <p className="section-heading">Severity Gauge</p>
+    <section
+      className="card card-pad"
+      aria-labelledby="severity-heading"
+      data-severity={level}
+    >
+      <h2 id="severity-heading" className="label">
+        Infection severity
+      </h2>
 
-      <div className="severity-gauge-container">
-        <svg viewBox="0 0 200 110" style={{ width: "100%", height: "100%" }}>
-          {/* Arc Segments */}
-          {segments.map((seg) => (
-            <path
-              key={seg.label}
-              d={arcPath(seg.startAngle, seg.endAngle, r)}
-              fill="none"
-              stroke={seg.color}
-              strokeWidth="14"
-              strokeLinecap="round"
-              opacity={seg.label === level ? 1 : 0.25}
-              style={{ transition: "opacity 0.5s" }}
-            />
-          ))}
+      <div style={{ display: "grid", placeItems: "center", marginTop: 6 }}>
+        <svg
+          viewBox="0 0 200 118"
+          width="100%"
+          style={{ maxWidth: 240 }}
+          role="img"
+          aria-label={`Severity ${level}, ${range} of leaf tissue affected, at ${(probability * 100).toFixed(0)} percent confidence.`}
+        >
+          <path
+            d={arcPath(ARC_START, ARC_END)}
+            fill="none"
+            stroke="var(--surface-2)"
+            strokeWidth={13}
+            strokeLinecap="round"
+          />
+          {distribution.map((bin, i) => {
+            const segStart =
+              ARC_START + ((ARC_END - ARC_START) * i) / distribution.length;
+            const segEnd =
+              ARC_START +
+              ((ARC_END - ARC_START) * (i + 1)) / distribution.length;
+            return (
+              <path
+                key={bin.className}
+                d={arcPath(segStart + 1.5, segEnd - 1.5)}
+                fill="none"
+                stroke={severityColor(bin.className)}
+                strokeWidth={13}
+                strokeLinecap="round"
+                opacity={i === index ? 1 : 0.2}
+                style={{ transition: "opacity var(--ease-in-out)" }}
+              />
+            );
+          })}
 
-          {/* Needle */}
           <g
-            className="severity-needle"
             style={{
-              transform: `rotate(${needleAngle}deg)`,
-              transformOrigin: `${cx}px ${cy}px`,
+              transform: `rotate(${angle}deg)`,
+              transformOrigin: `${CENTER_X}px ${CENTER_Y}px`,
+              transition: "transform var(--ease-spring)",
             }}
           >
             <line
-              x1={cx}
-              y1={cy}
-              x2={cx}
-              y2={cy - r + 18}
-              stroke={color}
-              strokeWidth="3"
+              x1={CENTER_X}
+              y1={CENTER_Y}
+              x2={CENTER_X}
+              y2={CENTER_Y - RADIUS + 16}
+              stroke="var(--text)"
+              strokeWidth={2.5}
               strokeLinecap="round"
             />
-            <circle cx={cx} cy={cy} r="6" fill={color} />
-            <circle cx={cx} cy={cy} r="3" fill="var(--bg-primary)" />
           </g>
+          <circle cx={CENTER_X} cy={CENTER_Y} r={5} fill="var(--text)" />
+          <circle cx={CENTER_X} cy={CENTER_Y} r={2} fill="var(--surface)" />
         </svg>
-      </div>
 
-      {/* Severity Level Display */}
-      <div style={{ textAlign: "center", marginTop: "8px" }}>
-        <span style={{
-          fontSize: "1.4rem",
-          fontWeight: 800,
-          color,
-          letterSpacing: "0.02em",
-        }}>
-          {level}
-        </span>
-        <span style={{
-          fontSize: "0.85rem",
-          color: "var(--text-muted)",
-          marginLeft: "8px",
-        }}>
-          ({(confidence * 100).toFixed(1)}%)
-        </span>
-      </div>
-
-      {/* Distribution Bars */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        gap: "6px",
-        marginTop: "16px",
-      }}>
-        {distribution.map((d) => (
-          <div key={d.level} style={{ textAlign: "center" }}>
-            <div style={{
-              height: "4px",
-              borderRadius: "2px",
-              background: `rgba(${d.level === "Mild" ? "74,222,128" : d.level === "Moderate" ? "250,204,21" : d.level === "Severe" ? "249,115,22" : "239,68,68"}, 0.2)`,
-              overflow: "hidden",
-              marginBottom: "4px",
-            }}>
-              <div style={{
-                height: "100%",
-                width: `${Math.round(d.confidence * 100)}%`,
-                background: SEVERITY_COLORS[d.level],
-                borderRadius: "2px",
-                transition: "width 1s cubic-bezier(0.4, 0, 0.2, 1)",
-              }} />
-            </div>
-            <span style={{
-              fontSize: "0.6rem",
-              color: d.level === level ? SEVERITY_COLORS[d.level] : "var(--text-muted)",
-              fontWeight: d.level === level ? 700 : 400,
-            }}>
-              {d.level}
-            </span>
+        <div style={{ textAlign: "center", marginTop: -6 }}>
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 660,
+              letterSpacing: "-0.015em",
+              color: "var(--sev)",
+            }}
+          >
+            {level}
           </div>
-        ))}
+          <div className="dim tnum" style={{ fontSize: 12.5, marginTop: 1 }}>
+            {range} of leaf tissue · {(probability * 100).toFixed(0)}%
+            confidence
+          </div>
+        </div>
       </div>
-    </div>
+
+      <ul
+        style={{
+          listStyle: "none",
+          margin: "16px 0 0",
+          padding: 0,
+          display: "grid",
+          gap: 6,
+        }}
+      >
+        {distribution.map((bin) => (
+          <li
+            key={bin.className}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "68px 1fr 40px",
+              gap: 8,
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: bin.className === level ? 620 : 460,
+                color:
+                  bin.className === level
+                    ? severityColor(bin.className)
+                    : "var(--text-2)",
+              }}
+            >
+              {bin.className}
+            </span>
+            <span className="meter" style={{ height: 5 }}>
+              <i
+                style={{
+                  width: `${bin.probability * 100}%`,
+                  background: severityColor(bin.className),
+                  opacity: bin.className === level ? 1 : 0.4,
+                }}
+              />
+            </span>
+            <span
+              className="tnum dim"
+              style={{ fontSize: 11.5, textAlign: "right" }}
+            >
+              {(bin.probability * 100).toFixed(0)}%
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <p
+        className="dim"
+        style={{ fontSize: 11.5, marginTop: 12, lineHeight: 1.45 }}
+      >
+        Severity labels are derived from colour segmentation, not agronomist
+        annotation. Treat this as an indication, not a measurement.
+      </p>
+    </section>
   );
+}
+
+function severityColor(level: string): string {
+  switch (level) {
+    case "Mild":
+      return "var(--mild)";
+    case "Moderate":
+      return "var(--moderate)";
+    case "Severe":
+      return "var(--severe)";
+    case "Critical":
+      return "var(--critical)";
+    default:
+      return "var(--text-3)";
+  }
+}
+
+/** Arc from `startDeg` to `endDeg`, measured from straight up, clockwise. */
+function arcPath(startDeg: number, endDeg: number): string {
+  const p0 = polar(startDeg);
+  const p1 = polar(endDeg);
+  const largeArc = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
+  return `M ${p0.x} ${p0.y} A ${RADIUS} ${RADIUS} 0 ${largeArc} 1 ${p1.x} ${p1.y}`;
+}
+
+function polar(degrees: number): { x: number; y: number } {
+  const radians = ((degrees - 90) * Math.PI) / 180;
+  return {
+    x: CENTER_X + RADIUS * Math.cos(radians),
+    y: CENTER_Y + RADIUS * Math.sin(radians),
+  };
 }

@@ -38,6 +38,17 @@ dependencies = [
     "kagglehub>=0.3.0",
 ]
 
+[project.optional-dependencies]
+# fp16 export. int8 needs only onnxruntime, which is already a core dependency.
+fp16 = ["onnxconverter-common>=1.14.0"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
 [tool.uv]
 # Use PyTorch CUDA index for GPU support
 extra-index-url = ["https://download.pytorch.org/whl/cu124"]

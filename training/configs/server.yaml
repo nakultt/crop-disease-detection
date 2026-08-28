@@ -1,0 +1,45 @@
+# Server-only configuration using the 300M-parameter MobileNetV5 backbone.
+#
+# WARNING: this exports to roughly 1.17 GB of fp32 ONNX. It exceeds both
+# deployment budgets by two orders of magnitude, so `src.export_onnx` will
+# refuse to copy it into pc/public/models or the Android assets directory.
+# Use it for a server-side inference API, or as an accuracy ceiling to compare
+# the mobile-grade presets against.
+
+data:
+  root: "./data/PlantVillage"
+  image_size: 256
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  severity_method: "color_segmentation"
+  num_workers: 4
+
+model:
+  backbone: "server"
+  pretrained: true
+  freeze_backbone: true
+  num_disease_classes: 38
+  num_severity_classes: 4
+  dropout: 0.3
+
+training:
+  epochs: 30
+  # A 300M backbone needs a smaller batch to fit in typical GPU memory.
+  batch_size: 8
+  lr: 0.001
+  fine_tune_lr: 0.00005
+  fine_tune_after_epoch: 10
+  unfreeze_blocks: 2
+  loss_weight_disease: 1.0
+  loss_weight_severity: 0.5
+  early_stopping_patience: 5
+  device: "cuda"
+  seed: 42
+  output_dir: "./outputs-server"
+
+export:
+  onnx_opset: 17
+  onnx_output: "./outputs-server/model.onnx"
+  pc_model_dir: "../pc/public/models"
+  mobile_assets_dir: "../mobile/app/src/main/assets"

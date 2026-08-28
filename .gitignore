@@ -1,0 +1,46 @@
+# Dataset — reproduced by `main.py download` (~2 GB)
+training/data/
+
+# Training scratch: checkpoints, logs, evaluation output.
+# best_model.pth is 29 MB and carries optimizer state; it is only needed to
+# resume or re-export, and `main.py train` reproduces it.
+training/outputs/
+training/outputs-*/
+training/train.log
+training/eval.log
+
+# The deployed models ARE committed — see the exception below.
+*.pth
+*.pt
+*.onnx
+
+# A fresh clone should be able to run both apps without a GPU, a 2 GB dataset
+# download, or an hour of training. The exported graph is 9.7 MB (9.0 MB
+# compressed), export is byte-reproducible so re-running it adds nothing to
+# history, and both copies share one blob because their content hash matches.
+# Only a genuine retrain writes a new object.
+!pc/public/models/model.onnx
+!mobile/app/src/main/assets/model.onnx
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+*.tsbuildinfo
+
+# Android
+.gradle/
+build/
+local.properties
+.idea/
+.kotlin/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db

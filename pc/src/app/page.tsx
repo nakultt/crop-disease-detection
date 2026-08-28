@@ -1,297 +1,501 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import ImageUploader from "./components/ImageUploader";
-import ResultCard from "./components/ResultCard";
+import { useCallback, useEffect, useRef, useState } from "react";
+import DiagnosisCard from "./components/DiagnosisCard";
+import Dropzone from "./components/Dropzone";
 import HeatmapViewer from "./components/HeatmapViewer";
-import SeverityGauge from "./components/SeverityGauge";
+import ModelStatus from "./components/ModelStatus";
 import RecommendationPanel from "./components/RecommendationPanel";
-import { predict, isModelAvailable } from "./lib/inference";
-import type { PredictionResult } from "./lib/inference";
-import { getRecommendations } from "./lib/recommendations";
-import type { Recommendation } from "./lib/recommendations";
+import SeverityGauge from "./components/SeverityGauge";
+import ThemeToggle from "./components/ThemeToggle";
+import {
+  backendLabel,
+  camForClass,
+  getManifest,
+  type LoadProgress,
+  loadModel,
+  type PredictionResult,
+  predict,
+} from "./lib/inference";
+import { displayName, ManifestError, type ModelManifest } from "./lib/manifest";
+
+interface Analysis {
+  id: string;
+  fileName: string;
+  previewUrl: string;
+  input: HTMLCanvasElement;
+  result: PredictionResult;
+}
+
+interface LoadError {
+  message: string;
+  hint?: string;
+}
 
 export default function Home() {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [result, setResult] = useState<PredictionResult | null>(null);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [modelReady, setModelReady] = useState<boolean | null>(null);
+  const [manifest, setManifest] = useState<ModelManifest | null>(null);
+  const [progress, setProgress] = useState<LoadProgress | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
+  const [backend, setBackend] = useState<string | null>(null);
 
-  const handleImageSelected = useCallback(async (file: File, url: string) => {
-    setPreviewUrl(url);
-    setResult(null);
-    setRecommendations([]);
-    setError(null);
-    setIsAnalyzing(true);
+  const [analyses, setAnalyses] = useState<Analysis[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedClass, setSelectedClass] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+
+  // Object URLs outlive React state, so track them for explicit revocation.
+  const objectUrls = useRef<string[]>([]);
+  useEffect(
+    () => () => {
+      for (const url of objectUrls.current) URL.revokeObjectURL(url);
+    },
+    [],
+  );
+
+  // Warm the model up front: the download dominates time-to-first-result, and
+  // starting it on page load means it is usually finished before an image is.
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const loaded = await getManifest();
+        if (cancelled) return;
+        setManifest(loaded);
+
+        await loadModel((p) => {
+          if (!cancelled) setProgress(p);
+        });
+        if (cancelled) return;
+        setBackend(backendLabel());
+      } catch (error) {
+        if (cancelled) return;
+        setProgress(null);
+        setLoadError(
+          error instanceof ManifestError
+            ? { message: error.message, hint: error.hint }
+            : {
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Unknown error loading the model.",
+                hint: "Export a model from training/: `uv run python main.py export --demo`",
+              },
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const active = analyses.find((a) => a.id === activeId) ?? null;
+
+  const handleFiles = useCallback(async (files: File[]) => {
+    setRunError(null);
+    setBusy(true);
 
     try {
-      // Check model availability
-      const available = await isModelAvailable();
-      setModelReady(available);
+      for (const file of files) {
+        const url = URL.createObjectURL(file);
+        objectUrls.current.push(url);
 
-      if (!available) {
-        setError(
-          "Model not found. Train the model first and export to ONNX, then copy to pc/public/models/model.onnx"
+        const image = await loadImage(url);
+        const { result, input } = await predict(
+          image,
+          image.naturalWidth,
+          image.naturalHeight,
         );
-        setIsAnalyzing(false);
-        return;
+
+        const analysis: Analysis = {
+          id: `${file.name}-${file.size}-${result.inferenceMs.toFixed(3)}`,
+          fileName: file.name,
+          previewUrl: url,
+          input,
+          result,
+        };
+
+        setAnalyses((prev) => [analysis, ...prev].slice(0, 12));
+        setActiveId(analysis.id);
+        setSelectedClass(result.disease.index);
       }
-
-      // Load image element
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error("Failed to load image"));
-        img.src = url;
-      });
-
-      // Run inference
-      const prediction = await predict(img);
-      setResult(prediction);
-
-      // Get recommendations
-      const recs = getRecommendations(prediction.disease.className, prediction.severity.level);
-      setRecommendations(recs);
-    } catch (err) {
-      console.error("Prediction failed:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Prediction failed. Make sure the model is exported and placed in public/models/"
-      );
+    } catch (error) {
+      setRunError(error instanceof Error ? error.message : "Analysis failed.");
     } finally {
-      setIsAnalyzing(false);
+      setBusy(false);
     }
   }, []);
 
-  const handleReset = useCallback(() => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
-    setResult(null);
-    setRecommendations([]);
-    setError(null);
-  }, [previewUrl]);
+  function reset() {
+    for (const url of objectUrls.current) URL.revokeObjectURL(url);
+    objectUrls.current = [];
+    setAnalyses([]);
+    setActiveId(null);
+    setSelectedClass(null);
+    setRunError(null);
+  }
+
+  const modelUsable = manifest !== null && loadError === null;
+  const camIndex = selectedClass ?? active?.result.disease.index ?? 0;
+  const camGrid = active ? camForClass(active.result, camIndex) : null;
 
   return (
     <>
-      {/* Animated Background */}
-      <div className="bg-animated" />
-      <div className="bg-grid" />
+      <a
+        href="#main"
+        className="btn btn-secondary"
+        style={{
+          position: "absolute",
+          left: 12,
+          top: -60,
+          zIndex: 20,
+          transition: "top var(--ease-out)",
+        }}
+        onFocus={(event) => {
+          event.currentTarget.style.top = "12px";
+        }}
+        onBlur={(event) => {
+          event.currentTarget.style.top = "-60px";
+        }}
+      >
+        Skip to content
+      </a>
 
-      {/* Main Content */}
-      <div style={{
-        position: "relative",
-        zIndex: 1,
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-      }}>
-        {/* Header */}
-        <header style={{
-          padding: "24px 32px",
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          height: "var(--header-h)",
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span className="leaf-float" style={{ fontSize: "1.6rem" }}>🌱</span>
-            <div>
-              <h1 style={{
-                fontSize: "1.2rem",
-                fontWeight: 800,
-                color: "var(--text-primary)",
-                margin: 0,
-                letterSpacing: "-0.02em",
-              }}>
-                PlantGuard AI
-              </h1>
-              <p style={{
-                fontSize: "0.7rem",
-                color: "var(--text-muted)",
-                margin: 0,
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-              }}>
-                Powered by MobileNetV5
-              </p>
-            </div>
-          </div>
-
-          <div style={{
+          background: "color-mix(in srgb, var(--bg) 82%, transparent)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <div
+          className="shell"
+          style={{
             display: "flex",
             alignItems: "center",
-            gap: "8px",
-            fontSize: "0.75rem",
-            color: "var(--text-muted)",
-          }}>
-            <div className="pulse-dot" style={{
-              backgroundColor: modelReady === false ? "var(--severity-critical)" : "var(--severity-mild)",
-            }} />
-            {modelReady === null ? "Checking model..." : modelReady ? "Model Ready" : "Model Not Loaded"}
-          </div>
-        </header>
+            gap: 12,
+            width: "100%",
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              display: "grid",
+              placeItems: "center",
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              background: "var(--accent)",
+              color: "var(--accent-on)",
+            }}
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 16c0-6 4-10 12-11 0 8-4 12-9 12a5 5 0 0 1-3-1Z" />
+              <path d="M4 16c2-4 5-6.5 9-8" />
+            </svg>
+          </span>
 
-        {/* Main Area */}
-        <main style={{
-          flex: 1,
-          maxWidth: "1200px",
-          width: "100%",
-          margin: "0 auto",
-          padding: "32px 24px",
-        }}>
-          {/* Hero Section (shown when no image) */}
-          {!previewUrl && (
-            <div style={{
-              textAlign: "center",
-              marginBottom: "40px",
-            }}>
-              <h2 style={{
-                fontSize: "2.2rem",
-                fontWeight: 800,
-                color: "var(--text-primary)",
-                lineHeight: 1.2,
-                marginBottom: "12px",
-                letterSpacing: "-0.03em",
-              }}>
-                Detect Plant Diseases
-                <br />
-                <span style={{ color: "var(--emerald-400)" }}>with Explainable AI</span>
-              </h2>
-              <p style={{
-                fontSize: "1rem",
-                color: "var(--text-secondary)",
-                maxWidth: "520px",
-                margin: "0 auto 32px",
-                lineHeight: 1.6,
-              }}>
-                Upload a leaf image to identify diseases, estimate severity,
-                and see which regions influenced the AI&apos;s decision.
-              </p>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontWeight: 640,
+                fontSize: 15,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              PlantGuard
             </div>
+          </div>
+
+          <div
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {analyses.length > 0 && (
+              <button type="button" className="btn btn-ghost" onClick={reset}>
+                Clear
+              </button>
+            )}
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
+
+      <main id="main" className="shell" style={{ paddingBlock: "28px 64px" }}>
+        {analyses.length === 0 && (
+          <section style={{ textAlign: "center", padding: "36px 0 28px" }}>
+            <h1
+              style={{
+                fontSize: "clamp(28px, 5vw, 40px)",
+                fontWeight: 680,
+                letterSpacing: "-0.025em",
+                lineHeight: 1.1,
+                maxWidth: "17ch",
+                marginInline: "auto",
+              }}
+            >
+              Diagnose a plant disease, and see the evidence
+            </h1>
+            <p
+              className="muted"
+              style={{
+                fontSize: 16,
+                marginTop: 14,
+                maxWidth: "56ch",
+                marginInline: "auto",
+                lineHeight: 1.55,
+              }}
+            >
+              Upload a leaf photograph to identify one of 38 conditions across
+              14 crops, estimate how far the infection has spread, and view the
+              exact regions that drove the model&rsquo;s decision.
+            </p>
+          </section>
+        )}
+
+        <div style={{ display: "grid", gap: 16 }}>
+          <ModelStatus
+            manifest={manifest}
+            progress={progress}
+            error={loadError}
+            backend={backend}
+          />
+
+          {analyses.length === 0 ? (
+            <Dropzone onFiles={handleFiles} disabled={!modelUsable || busy} />
+          ) : (
+            <Dropzone
+              onFiles={handleFiles}
+              disabled={!modelUsable || busy}
+              compact
+            />
           )}
 
-          {/* Upload / Preview Row */}
-          {!previewUrl ? (
-            <div style={{ maxWidth: "560px", margin: "0 auto" }}>
-              <ImageUploader
-                onImageSelected={handleImageSelected}
-                disabled={isAnalyzing}
-              />
-            </div>
-          ) : (
-            <div>
-              {/* Preview Header */}
-              <div style={{
+          {busy && (
+            <div
+              className="card card-pad"
+              aria-live="polite"
+              style={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: "24px",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={previewUrl}
-                    alt="Uploaded leaf"
-                    style={{
-                      width: "48px",
-                      height: "48px",
-                      objectFit: "cover",
-                      borderRadius: "12px",
-                      border: "2px solid var(--border-accent)",
-                    }}
-                  />
-                  <div>
-                    <p style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                      {isAnalyzing ? "Analyzing..." : result ? "Analysis Complete" : "Processing..."}
-                    </p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
-                      {isAnalyzing ? "Running MobileNetV5 inference" : result ? "Disease & severity detected" : ""}
-                    </p>
-                  </div>
-                </div>
-
-                <button className="btn-ghost" onClick={handleReset} id="new-analysis-button">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                    <path d="M3 3v5h5" />
-                  </svg>
-                  New Analysis
-                </button>
-              </div>
-
-              {/* Loading State */}
-              {isAnalyzing && (
-                <div style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "64px 0",
-                  gap: "16px",
-                }}>
-                  <div className="spinner" />
-                  <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                    Running inference on your leaf image...
-                  </p>
-                </div>
-              )}
-
-              {/* Error State */}
-              {error && (
-                <div className="glass-card" style={{
-                  padding: "24px",
-                  borderColor: "rgba(239, 68, 68, 0.3)",
-                  background: "rgba(239, 68, 68, 0.05)",
-                }}>
-                  <p style={{ fontSize: "0.9rem", color: "var(--severity-critical)", margin: 0 }}>
-                    ⚠️ {error}
-                  </p>
-                </div>
-              )}
-
-              {/* Results Grid */}
-              {result && (
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "20px",
-                }}>
-                  {/* Left Column */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                    <ResultCard result={result} />
-                    <SeverityGauge
-                      level={result.severity.level}
-                      confidence={result.severity.confidence}
-                      distribution={result.severity.distribution}
-                    />
-                  </div>
-
-                  {/* Right Column */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                    <HeatmapViewer imageUrl={previewUrl} />
-                    <RecommendationPanel recommendations={recommendations} />
-                  </div>
-                </div>
-              )}
+                gap: 10,
+                fontSize: 14,
+              }}
+            >
+              <span className="spinner" style={{ color: "var(--accent)" }} />
+              Analysing&hellip;
             </div>
           )}
-        </main>
 
-        {/* Footer */}
-        <footer style={{
-          padding: "16px 32px",
-          borderTop: "1px solid var(--border-subtle)",
-          textAlign: "center",
-          fontSize: "0.75rem",
-          color: "var(--text-muted)",
-        }}>
-          Explainable Multi-Task Plant Disease Detection · MobileNetV5 + Grad-CAM · B.Tech Project
-        </footer>
-      </div>
+          {runError && (
+            <div
+              role="alert"
+              className="card card-pad"
+              style={{
+                borderColor:
+                  "color-mix(in srgb, var(--critical) 40%, var(--border))",
+                color: "var(--critical)",
+                fontSize: 14,
+              }}
+            >
+              {runError}
+            </div>
+          )}
+
+          {analyses.length > 1 && (
+            <HistoryStrip
+              analyses={analyses}
+              activeId={activeId}
+              onSelect={(id) => {
+                setActiveId(id);
+                const chosen = analyses.find((a) => a.id === id);
+                setSelectedClass(chosen?.result.disease.index ?? null);
+              }}
+            />
+          )}
+
+          {active && camGrid && (
+            <div
+              className="rise"
+              style={{
+                display: "grid",
+                gap: 16,
+                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                alignItems: "start",
+              }}
+            >
+              <div style={{ display: "grid", gap: 16 }}>
+                <HeatmapViewer
+                  source={active.input}
+                  cam={camGrid}
+                  gridH={active.result.gridH}
+                  gridW={active.result.gridW}
+                  explaining={displayName(
+                    manifest?.classes.disease[camIndex] ??
+                      active.result.disease.className,
+                  )}
+                  exact={manifest?.cam.exact ?? false}
+                />
+              </div>
+
+              <div style={{ display: "grid", gap: 16 }}>
+                <DiagnosisCard
+                  result={active.result}
+                  selectedIndex={camIndex}
+                  onSelect={setSelectedClass}
+                />
+                <SeverityGauge
+                  level={active.result.severity.className}
+                  range={active.result.severity.range}
+                  probability={active.result.severity.probability}
+                  distribution={active.result.severity.distribution}
+                  healthy={active.result.disease.healthy}
+                />
+                <RecommendationPanel
+                  diseaseClass={active.result.disease.className}
+                  severity={active.result.severity.className}
+                  healthy={active.result.disease.healthy}
+                  trustworthy={manifest?.trained ?? false}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      <footer
+        style={{
+          borderTop: "1px solid var(--border)",
+          paddingBlock: 20,
+          marginTop: "auto",
+        }}
+      >
+        <div
+          className="shell dim"
+          style={{
+            fontSize: 12,
+            display: "flex",
+            gap: 12,
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+          }}
+        >
+          <span>
+            Runs entirely in your browser. Photographs never leave your device.
+          </span>
+          {manifest && (
+            <span className="mono">
+              {manifest.backbone.split(".")[0]} ·{" "}
+              {manifest.classes.disease.length} classes
+            </span>
+          )}
+        </div>
+      </footer>
     </>
+  );
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () =>
+      reject(new Error("That file could not be decoded as an image."));
+    image.src = url;
+  });
+}
+
+function HistoryStrip({
+  analyses,
+  activeId,
+  onSelect,
+}: {
+  analyses: Analysis[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <section aria-label="Previous analyses">
+      <h2 className="label" style={{ marginBottom: 8 }}>
+        This session
+      </h2>
+      <div
+        className="scroll-x"
+        style={{ display: "flex", gap: 8, paddingBottom: 4 }}
+      >
+        {analyses.map((analysis) => {
+          const active = analysis.id === activeId;
+          return (
+            <button
+              key={analysis.id}
+              type="button"
+              onClick={() => onSelect(analysis.id)}
+              aria-pressed={active}
+              title={`${analysis.fileName} — ${displayName(analysis.result.disease.className)}`}
+              style={{
+                flex: "none",
+                width: 92,
+                padding: 4,
+                borderRadius: "var(--radius-md)",
+                border: `1.5px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                background: active ? "var(--accent-soft)" : "var(--surface)",
+                transition:
+                  "border-color var(--ease-out), background var(--ease-out)",
+              }}
+            >
+              {/* biome-ignore lint/performance/noImgElement: the source is a blob: object URL for a file the user just picked, which next/image cannot optimise. */}
+              <img
+                src={analysis.previewUrl}
+                alt=""
+                width={82}
+                height={62}
+                style={{
+                  width: "100%",
+                  height: 62,
+                  objectFit: "cover",
+                  borderRadius: "var(--radius-sm)",
+                  display: "block",
+                }}
+              />
+              <span
+                className="tnum"
+                style={{
+                  display: "block",
+                  fontSize: 10.5,
+                  marginTop: 4,
+                  color: active ? "var(--accent)" : "var(--text-3)",
+                  fontWeight: 560,
+                }}
+              >
+                {(analysis.result.disease.probability * 100).toFixed(0)}%
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }

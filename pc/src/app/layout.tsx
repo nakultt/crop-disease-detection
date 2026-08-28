@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
+import { THEME_BOOT_SCRIPT } from "./components/ThemeToggle";
 import "./globals.css";
 
 const inter = Inter({
@@ -8,37 +9,54 @@ const inter = Inter({
   display: "swap",
 });
 
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono-stack",
+  subsets: ["latin"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "PlantGuard AI — Disease Detection & Severity Analysis",
+  title: "PlantGuard — plant disease detection in your browser",
   description:
-    "Explainable multi-task plant disease detection and severity estimation powered by MobileNetV5. Upload a leaf image to identify diseases, assess severity, and visualize AI explanations with Grad-CAM.",
+    "Identify plant diseases, estimate infection severity, and see exactly where the model looked. Runs entirely on your device; photographs are never uploaded.",
   keywords: [
     "plant disease detection",
     "crop disease",
     "severity estimation",
-    "Grad-CAM",
-    "MobileNetV5",
+    "class activation map",
     "explainable AI",
-    "agriculture AI",
+    "on-device inference",
+    "agriculture",
   ],
   openGraph: {
-    title: "PlantGuard AI — Disease Detection & Severity Analysis",
+    title: "PlantGuard — plant disease detection in your browser",
     description:
-      "AI-powered plant disease detection with severity estimation and visual explanations.",
+      "Identify plant diseases and see exactly where the model looked. Runs entirely on-device.",
     type: "website",
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f8f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0f0d" },
+  ],
+};
+
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} antialiased`}>
-      <body style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-        {children}
-      </body>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <head>
+        {/* Applies the stored theme before first paint, so there is no flash of
+            the wrong palette on load. */}
+        <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: build-time constant with no user input, and it must execute before hydration to avoid a flash of the wrong theme.
+          dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
+        />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }

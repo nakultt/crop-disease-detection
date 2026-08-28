@@ -31,8 +31,7 @@ from sklearn.metrics import (
 from tqdm import tqdm
 
 from .dataset import create_dataloaders, get_transforms
-from .gradcam import GradCAM
-from .model import MultiTaskMobileNetV5
+from .model import MultiTaskPlantModel
 from .utils import (
     DISEASE_CLASSES,
     SEVERITY_CLASSES,
@@ -45,7 +44,7 @@ from .utils import (
 
 @torch.no_grad()
 def collect_predictions(
-    model: MultiTaskMobileNetV5,
+    model: MultiTaskPlantModel,
     loader: torch.utils.data.DataLoader,
     device: torch.device,
 ) -> dict:
@@ -149,18 +148,19 @@ def plot_confusion_matrix(
 
 
 def generate_sample_gradcams(
-    model: MultiTaskMobileNetV5,
+    model: MultiTaskPlantModel,
     predictions: dict,
     data_root: Path,
     output_dir: Path,
     device: torch.device,
     num_samples: int = 16,
+    image_size: int = 256,
 ) -> None:
-    """Generate Grad-CAM visualizations for sample images."""
-    from .gradcam import generate_gradcam_visualization
+    """Render CAM triptychs for a mix of correct and incorrect predictions."""
+    from .gradcam import generate_cam_visualization
 
     gradcam_dir = ensure_dir(output_dir / "gradcam")
-    transform = get_transforms(image_size=256, train=False)
+    transform = get_transforms(image_size=image_size, train=False)
 
     # Select samples: mix of correct and incorrect predictions
     correct_indices = [
@@ -194,7 +194,7 @@ def generate_sample_gradcams(
         output_path = gradcam_dir / f"{correct}_{idx}_{Path(predictions['paths'][idx]).stem}.png"
 
         try:
-            generate_gradcam_visualization(
+            generate_cam_visualization(
                 model=model,
                 image_path=img_path,
                 device=device,
@@ -219,13 +219,14 @@ def evaluate(config: dict, checkpoint_path: str) -> None:
     print("Loading model checkpoint...")
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
-    model = MultiTaskMobileNetV5(
+    model = MultiTaskPlantModel(
         backbone_name=model_cfg["backbone"],
         pretrained=False,
         num_disease_classes=model_cfg["num_disease_classes"],
         num_severity_classes=model_cfg["num_severity_classes"],
         dropout=model_cfg["dropout"],
         freeze_backbone=False,
+        image_size=data_cfg["image_size"],
     )
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
@@ -335,6 +336,7 @@ def evaluate(config: dict, checkpoint_path: str) -> None:
         output_dir=output_dir,
         device=device,
         num_samples=16,
+        image_size=data_cfg['image_size'],
     )
 
     # ── Save summary ──
@@ -359,6 +361,19 @@ def evaluate(config: dict, checkpoint_path: str) -> None:
 
     with open(output_dir / "evaluation_summary.json", "w") as f:
         json.dump(summary, f, indent=2)
+
+    # The exporter folds these into model.json so the apps can show real
+    # accuracy figures instead of hardcoded marketing numbers.
+    manifest_metrics = {
+        "diseaseAccuracy": disease_metrics["accuracy"],
+        "diseaseMacroF1": disease_metrics["f1_macro"],
+        "severityAccuracy": severity_metrics["accuracy"],
+        "severityMacroF1": severity_metrics["f1_macro"],
+        "evaluatedOn": "test",
+        "numSamples": len(predictions["paths"]),
+    }
+    with open(Path(train_cfg["output_dir"]) / "test_metrics.json", "w") as f:
+        json.dump(manifest_metrics, f, indent=2)
 
     print(f"\nAll results saved to: {output_dir}")
 

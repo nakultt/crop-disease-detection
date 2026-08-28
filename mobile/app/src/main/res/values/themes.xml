@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Compose paints the real UI; this only covers the pre-Compose window so
+         launching does not flash white in dark mode.
 
-    <style name="Theme.Mobile" parent="android:Theme.Material.Light.NoActionBar" />
+         The parent is the light Material theme rather than a DayNight variant:
+         the framework has no `Theme.Material.DayNight`, and
+         `Theme.DeviceDefault.DayNight` only exists from API 29 while this app
+         supports 26. Dark mode is handled by `values-night/colors.xml`
+         overriding `window_background`, which works on every API level. -->
+    <style name="Theme.PlantGuard" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

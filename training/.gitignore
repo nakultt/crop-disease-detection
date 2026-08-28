@@ -1,0 +1,10 @@
+outputs/
+outputs-*/
+data/
+.venv/
+__pycache__/
+*.py[cod]
+*.onnx
+*.pth
+*.pt
+.pytest_cache/
