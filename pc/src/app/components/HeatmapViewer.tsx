@@ -13,26 +13,16 @@ import {
 type ViewMode = "overlay" | "split";
 
 interface HeatmapViewerProps {
-  /** The preprocessed square input — what the model actually saw. */
   source: HTMLCanvasElement;
-  /** Raw CAM grid for the class being explained. */
   cam: Float32Array;
   gridH: number;
   gridW: number;
-  /** Name of the class this heatmap explains, for the caption. */
   explaining: string;
   exact: boolean;
 }
 
 const CANVAS_SIZE = 512;
 
-/**
- * Shows where the model looked.
- *
- * The heatmap is a class activation map read straight out of the ONNX graph, so
- * it reflects the actual evidence behind the logit rather than a colour
- * heuristic applied to the photograph.
- */
 export default function HeatmapViewer({
   source,
   cam,
@@ -44,7 +34,7 @@ export default function HeatmapViewer({
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const plainRef = useRef<HTMLCanvasElement>(null);
 
-  const [opacity, setOpacity] = useState(0.6);
+  const [opacity, setOpacity] = useState(0.65);
   const [colormap, setColormap] = useState<ColormapName>("inferno");
   const [mode, setMode] = useState<ViewMode>("overlay");
 
@@ -74,26 +64,25 @@ export default function HeatmapViewer({
       <header
         style={{
           display: "flex",
-          alignItems: "center",
-          gap: 12,
+          alignItems: "flex-start",
+          gap: 16,
           flexWrap: "wrap",
-          marginBottom: 14,
+          marginBottom: 20,
         }}
       >
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <h2
             id="heatmap-heading"
             className="label"
-            style={{ marginBottom: 3 }}
+            style={{ marginBottom: 6 }}
           >
-            Where the model looked
+            Why this prediction?
           </h2>
-          <p className="dim" style={{ fontSize: 12 }}>
+          <p className="dim" style={{ fontSize: 13, lineHeight: 1.5 }}>
             {exact
-              ? "Exact class activation map"
-              : "Approximate activation map"}{" "}
-            for{" "}
-            <strong style={{ color: "var(--text-2)", fontWeight: 560 }}>
+              ? "The highlighted regions show the areas that contributed to the prediction"
+              : "Approximate activation map for this prediction"} for{" "}
+            <strong style={{ color: "var(--text)", fontWeight: 660 }}>
               {explaining}
             </strong>
           </p>
@@ -101,7 +90,7 @@ export default function HeatmapViewer({
 
         <fieldset
           className="segmented"
-          style={{ marginLeft: "auto", border: 0, padding: 2, margin: 0 }}
+          style={{ border: 0, padding: 4, margin: 0 }}
         >
           <legend className="sr-only">View mode</legend>
           {(["overlay", "split"] as ViewMode[]).map((value) => (
@@ -121,7 +110,7 @@ export default function HeatmapViewer({
         style={{
           display: "grid",
           gridTemplateColumns: mode === "split" ? "1fr 1fr" : "1fr",
-          gap: 10,
+          gap: 16,
         }}
       >
         {mode === "split" && (
@@ -134,7 +123,7 @@ export default function HeatmapViewer({
               style={canvasStyle}
             />
             <figcaption className="dim" style={captionStyle}>
-              Model input
+              Original Image
             </figcaption>
           </figure>
         )}
@@ -149,7 +138,7 @@ export default function HeatmapViewer({
             style={canvasStyle}
           />
           <figcaption className="dim" style={captionStyle}>
-            {mode === "split" ? "Activation overlay" : description}
+            {mode === "split" ? "AI Evidence" : description}
           </figcaption>
         </figure>
       </div>
@@ -158,9 +147,12 @@ export default function HeatmapViewer({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 16,
+          gap: 24,
           flexWrap: "wrap",
-          marginTop: 14,
+          marginTop: 24,
+          padding: "16px",
+          background: "var(--surface-2)",
+          borderRadius: "var(--radius-lg)",
         }}
       >
         <div style={{ flex: "1 1 200px", minWidth: 160 }}>
@@ -170,11 +162,11 @@ export default function HeatmapViewer({
             style={{
               display: "flex",
               justifyContent: "space-between",
-              marginBottom: 4,
+              marginBottom: 10,
             }}
           >
-            <span>Overlay</span>
-            <output className="tnum" htmlFor="heatmap-opacity">
+            <span>Overlay Intensity</span>
+            <output className="tnum" htmlFor="heatmap-opacity" style={{ color: "var(--primary)" }}>
               {Math.round(opacity * 100)}%
             </output>
           </label>
@@ -191,7 +183,7 @@ export default function HeatmapViewer({
         </div>
 
         <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-          <legend className="label" style={{ marginBottom: 5 }}>
+          <legend className="label" style={{ marginBottom: 10 }}>
             Colour scale
           </legend>
           <div className="segmented">
@@ -220,20 +212,20 @@ const canvasStyle: React.CSSProperties = {
   height: "auto",
   aspectRatio: "1 / 1",
   display: "block",
-  borderRadius: "var(--radius-md)",
+  borderRadius: "var(--radius-lg)",
   background: "var(--surface-2)",
+  boxShadow: "var(--shadow-1)",
 };
 
 const captionStyle: React.CSSProperties = {
-  fontSize: 12,
-  marginTop: 7,
+  fontSize: 13,
+  fontWeight: 600,
+  marginTop: 10,
   textAlign: "center",
 };
 
-/** A gradient bar so the colours are readable as values, not decoration. */
 function ScaleLegend({ colormap }: { colormap: ColormapName }) {
   const gradient = useMemo(() => {
-    // Sample the LUT at 11 stops — enough to reproduce the ramp faithfully in CSS.
     const stops: string[] = [];
     for (let i = 0; i <= 10; i++) {
       const t = i / 10;
@@ -243,14 +235,14 @@ function ScaleLegend({ colormap }: { colormap: ColormapName }) {
   }, [colormap]);
 
   return (
-    <div style={{ marginTop: 12 }}>
+    <div style={{ marginTop: 24, padding: "0 8px" }}>
       <div
         aria-hidden="true"
         style={{
-          height: 8,
+          height: 10,
           borderRadius: "var(--radius-full)",
           background: gradient,
-          border: "1px solid var(--border)",
+          border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
         }}
       />
       <div
@@ -258,12 +250,13 @@ function ScaleLegend({ colormap }: { colormap: ColormapName }) {
         style={{
           display: "flex",
           justifyContent: "space-between",
-          fontSize: 11,
-          marginTop: 4,
+          fontSize: 12,
+          fontWeight: 600,
+          marginTop: 8,
         }}
       >
         <span>Little influence</span>
-        <span>Strong influence on this prediction</span>
+        <span>Strong influence on prediction</span>
       </div>
     </div>
   );

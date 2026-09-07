@@ -1,129 +1,138 @@
 @import "tailwindcss";
 
-/* ============================================================================
-   PlantGuard design tokens — see docs/DESIGN_SYSTEM.md
-   Light is the base; dark overrides only what changes. `[data-theme]` wins over
-   the media query in both directions so an explicit user choice always sticks.
-   ========================================================================== */
-
 :root {
-  --bg: #f6f8f6;
+  --bg: #fcf9f2;
   --surface: #ffffff;
-  --surface-2: #eef2ee;
-  --surface-3: #e2e9e3;
-  --border: #d6ded8;
-  --border-strong: #b6c3ba;
+  --surface-2: #f2efe4;
+  --surface-3: #e8e4d5;
+  --border: #e0dbce;
+  --border-strong: #c4bdab;
 
-  --text: #111b15;
-  --text-2: #4a5a50;
-  --text-3: #71857a;
+  --text: #1a2417;
+  --text-2: #4a5746;
+  --text-3: #7a8a75;
 
-  --accent: #12805c;
-  --accent-hover: #0d6b4d;
-  --accent-soft: #e3f3ec;
-  --accent-on: #ffffff;
+  --primary: #6b7f5e;
+  --primary-hover: #2f4d2f;
+  --primary-soft: #eaf0e6;
+  --primary-on: #ffffff;
 
-  --mild: #2f8f4e;
-  --moderate: #b3810a;
-  --severe: #c2570d;
-  --critical: #c0322b;
+  --accent: #d4af37;
+  --accent-hover: #b8962e;
+  --accent-soft: #fbf5df;
+  --accent-on: #3b300b;
 
-  --mild-soft: #e6f4ea;
-  --moderate-soft: #fbf1d8;
-  --severe-soft: #fbeade;
-  --critical-soft: #fbe6e4;
+  --mild: #6b8e23;
+  --moderate: #cd853f;
+  --severe: #d2691e;
+  --critical: #8b0000;
 
-  --shadow-1: 0 1px 2px rgb(16 32 24 / 0.06), 0 1px 1px rgb(16 32 24 / 0.04);
-  --shadow-2: 0 4px 16px rgb(16 32 24 / 0.08), 0 1px 3px rgb(16 32 24 / 0.05);
-  --shadow-3: 0 12px 40px rgb(16 32 24 / 0.12), 0 2px 8px rgb(16 32 24 / 0.06);
+  --mild-soft: #f0f4e6;
+  --moderate-soft: #f9efe3;
+  --severe-soft: #f9eade;
+  --critical-soft: #f4e6e6;
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  --shadow-1: 0 4px 12px rgba(46, 66, 26, 0.04), 0 1px 3px rgba(46, 66, 26, 0.02);
+  --shadow-2: 0 8px 24px rgba(46, 66, 26, 0.06), 0 2px 6px rgba(46, 66, 26, 0.04);
+  --shadow-3: 0 16px 48px rgba(46, 66, 26, 0.08), 0 4px 12px rgba(46, 66, 26, 0.05);
+
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
   --radius-full: 9999px;
 
-  --ease-out: 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ease-in-out: 240ms cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-spring: 420ms cubic-bezier(0.34, 1.32, 0.64, 1);
+  --ease-out: 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: 600ms cubic-bezier(0.34, 1.32, 0.64, 1);
 
   --font-sans:
     var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono:
     var(--font-mono-stack), ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --header-h: 60px;
-  --content-max: 1180px;
+  --header-h: 72px;
+  --content-max: 1200px;
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0b0f0d;
-    --surface: #141a17;
-    --surface-2: #1c2420;
-    --surface-3: #26302a;
-    --border: #26302a;
-    --border-strong: #3a4741;
+    --bg: #1a1e18;
+    --surface: #242921;
+    --surface-2: #2d3329;
+    --surface-3: #394234;
+    --border: #394234;
+    --border-strong: #4c5746;
 
-    --text: #e8efe9;
-    --text-2: #a5b5ab;
-    --text-3: #7d8f85;
+    --text: #f0f2ef;
+    --text-2: #a7b5a2;
+    --text-3: #82917d;
 
-    --accent: #3ddc97;
-    --accent-hover: #5ee5ab;
-    --accent-soft: #12312a;
-    --accent-on: #04150e;
+    --primary: #8fa881;
+    --primary-hover: #b4c9a8;
+    --primary-soft: #273322;
+    --primary-on: #111a0d;
 
-    --mild: #4ade80;
-    --moderate: #fbbf24;
-    --severe: #fb923c;
-    --critical: #f87171;
+    --accent: #ebd581;
+    --accent-hover: #fcedb6;
+    --accent-soft: #383115;
+    --accent-on: #292004;
 
-    --mild-soft: #123322;
-    --moderate-soft: #33280a;
-    --severe-soft: #33210f;
-    --critical-soft: #331715;
+    --mild: #88b04b;
+    --moderate: #e3a857;
+    --severe: #e5874c;
+    --critical: #d45050;
 
-    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-2: 0 4px 16px rgb(0 0 0 / 0.45);
-    --shadow-3: 0 12px 40px rgb(0 0 0 / 0.55);
+    --mild-soft: #23331a;
+    --moderate-soft: #382913;
+    --severe-soft: #361f12;
+    --critical-soft: #361414;
+
+    --shadow-1: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --shadow-3: 0 16px 48px rgba(0, 0, 0, 0.6);
 
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0b0f0d;
-  --surface: #141a17;
-  --surface-2: #1c2420;
-  --surface-3: #26302a;
-  --border: #26302a;
-  --border-strong: #3a4741;
+  --bg: #1a1e18;
+  --surface: #242921;
+  --surface-2: #2d3329;
+  --surface-3: #394234;
+  --border: #394234;
+  --border-strong: #4c5746;
 
-  --text: #e8efe9;
-  --text-2: #a5b5ab;
-  --text-3: #7d8f85;
+  --text: #f0f2ef;
+  --text-2: #a7b5a2;
+  --text-3: #82917d;
 
-  --accent: #3ddc97;
-  --accent-hover: #5ee5ab;
-  --accent-soft: #12312a;
-  --accent-on: #04150e;
+  --primary: #8fa881;
+  --primary-hover: #b4c9a8;
+  --primary-soft: #273322;
+  --primary-on: #111a0d;
 
-  --mild: #4ade80;
-  --moderate: #fbbf24;
-  --severe: #fb923c;
-  --critical: #f87171;
+  --accent: #ebd581;
+  --accent-hover: #fcedb6;
+  --accent-soft: #383115;
+  --accent-on: #292004;
 
-  --mild-soft: #123322;
-  --moderate-soft: #33280a;
-  --severe-soft: #33210f;
-  --critical-soft: #331715;
+  --mild: #88b04b;
+  --moderate: #e3a857;
+  --severe: #e5874c;
+  --critical: #d45050;
 
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-2: 0 4px 16px rgb(0 0 0 / 0.45);
-  --shadow-3: 0 12px 40px rgb(0 0 0 / 0.55);
+  --mild-soft: #23331a;
+  --moderate-soft: #382913;
+  --severe-soft: #361f12;
+  --critical-soft: #361414;
+
+  --shadow-1: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 16px 48px rgba(0, 0, 0, 0.6);
 
   color-scheme: dark;
 }
@@ -135,8 +144,6 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 }
-
-/* --- Base ---------------------------------------------------------------- */
 
 *,
 *::before,
@@ -155,12 +162,11 @@ body {
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 15px;
-  line-height: 1.53;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Percentages and metrics must not jitter as they animate. */
 .tnum,
 output,
 [data-metric] {
@@ -189,23 +195,21 @@ button {
 }
 
 a {
-  color: var(--accent);
+  color: var(--primary);
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
 ::selection {
-  background: var(--accent);
-  color: var(--accent-on);
+  background: var(--primary);
+  color: var(--primary-on);
 }
-
-/* --- Scrollbars ---------------------------------------------------------- */
 
 * {
   scrollbar-width: thin;
@@ -228,21 +232,17 @@ a {
   border-radius: var(--radius-full);
 }
 
-/* --- Layout -------------------------------------------------------------- */
-
 .shell {
   max-width: var(--content-max);
   margin-inline: auto;
-  padding-inline: 20px;
+  padding-inline: 24px;
 }
 
 @media (max-width: 640px) {
   .shell {
-    padding-inline: 14px;
+    padding-inline: 16px;
   }
 }
-
-/* --- Surfaces ------------------------------------------------------------ */
 
 .card {
   background: var(--surface);
@@ -252,19 +252,19 @@ a {
 }
 
 .card-pad {
-  padding: 20px;
+  padding: 28px;
 }
 
 @media (max-width: 640px) {
   .card-pad {
-    padding: 16px;
+    padding: 20px;
   }
 }
 
 .label {
-  font-size: 11px;
-  font-weight: 620;
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-3);
 }
@@ -279,32 +279,31 @@ a {
 
 .mono {
   font-family: var(--font-mono);
-  font-size: 0.86em;
+  font-size: 0.88em;
 }
-
-/* --- Buttons ------------------------------------------------------------- */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 16px;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 24px;
   border-radius: var(--radius-full);
   border: 1px solid transparent;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 560;
   white-space: nowrap;
   transition:
     background var(--ease-out),
     border-color var(--ease-out),
     color var(--ease-out),
-    transform var(--ease-out);
+    transform var(--ease-out),
+    box-shadow var(--ease-out);
 }
 
 .btn:active {
-  transform: translateY(1px);
+  transform: translateY(2px);
 }
 
 .btn:disabled {
@@ -314,23 +313,27 @@ a {
 }
 
 .btn-primary {
-  background: var(--accent);
-  color: var(--accent-on);
+  background: var(--primary);
+  color: var(--primary-on);
+  box-shadow: var(--shadow-1);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: var(--primary-hover);
+  box-shadow: var(--shadow-2);
 }
 
 .btn-secondary {
   background: var(--surface);
   border-color: var(--border);
   color: var(--text);
+  box-shadow: var(--shadow-1);
 }
 
 .btn-secondary:hover:not(:disabled) {
   background: var(--surface-2);
   border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
 }
 
 .btn-ghost {
@@ -344,12 +347,10 @@ a {
 }
 
 .btn-icon {
-  min-height: 40px;
-  width: 40px;
+  min-height: 44px;
+  width: 44px;
   padding: 0;
 }
-
-/* --- Severity ------------------------------------------------------------ */
 
 [data-severity="Mild"] {
   --sev: var(--mild);
@@ -371,29 +372,27 @@ a {
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
+  gap: 8px;
+  padding: 6px 14px;
   border-radius: var(--radius-full);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   background: var(--sev-soft, var(--surface-2));
   color: var(--sev, var(--text-2));
   border: 1px solid
-    color-mix(in srgb, var(--sev, var(--border)) 28%, transparent);
+    color-mix(in srgb, var(--sev, var(--border)) 30%, transparent);
 }
 
 .dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: currentColor;
   flex: none;
 }
 
-/* --- Meters -------------------------------------------------------------- */
-
 .meter {
-  height: 6px;
+  height: 8px;
   border-radius: var(--radius-full);
   background: var(--surface-2);
   overflow: hidden;
@@ -403,28 +402,26 @@ a {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--accent);
+  background: var(--primary);
   transition: width var(--ease-spring);
 }
-
-/* --- Range input --------------------------------------------------------- */
 
 .range {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 20px;
+  height: 24px;
   background: transparent;
 }
 
 .range::-webkit-slider-runnable-track {
-  height: 4px;
+  height: 6px;
   border-radius: var(--radius-full);
   background: var(--surface-3);
 }
 
 .range::-moz-range-track {
-  height: 4px;
+  height: 6px;
   border-radius: var(--radius-full);
   background: var(--surface-3);
 }
@@ -432,35 +429,33 @@ a {
 .range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
-  margin-top: -6px;
+  width: 20px;
+  height: 20px;
+  margin-top: -7px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--primary);
   border: 2px solid var(--surface);
   box-shadow: var(--shadow-1);
   transition: transform var(--ease-out);
 }
 
 .range::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--primary);
   border: 2px solid var(--surface);
   box-shadow: var(--shadow-1);
 }
 
 .range:hover::-webkit-slider-thumb {
-  transform: scale(1.12);
+  transform: scale(1.15);
 }
-
-/* --- Segmented control --------------------------------------------------- */
 
 .segmented {
   display: inline-flex;
-  padding: 2px;
-  gap: 2px;
+  padding: 4px;
+  gap: 4px;
   background: var(--surface-2);
   border-radius: var(--radius-full);
   border: 1px solid var(--border);
@@ -470,13 +465,14 @@ a {
   border: 0;
   background: transparent;
   color: var(--text-2);
-  font-size: 12px;
-  font-weight: 560;
-  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
   border-radius: var(--radius-full);
   transition:
     background var(--ease-out),
-    color var(--ease-out);
+    color var(--ease-out),
+    box-shadow var(--ease-out);
 }
 
 .segmented button[aria-pressed="true"] {
@@ -485,12 +481,10 @@ a {
   box-shadow: var(--shadow-1);
 }
 
-/* --- Motion -------------------------------------------------------------- */
-
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -515,12 +509,12 @@ a {
 }
 
 .spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid color-mix(in srgb, currentColor 25%, transparent);
   border-top-color: currentColor;
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  animation: spin 0.8s linear infinite;
   flex: none;
 }
 
@@ -545,9 +539,6 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* biome-ignore-start lint/complexity/noImportantStyles: this block must beat
-     every component-level duration, including inline styles, or a user who asked
-     for reduced motion still gets animation. */
   *,
   *::before,
   *::after {
@@ -560,10 +551,7 @@ a {
   .rise {
     transform: none !important;
   }
-  /* biome-ignore-end lint/complexity/noImportantStyles: end of reduced-motion overrides */
 }
-
-/* --- Utilities ----------------------------------------------------------- */
 
 .sr-only {
   position: absolute;
@@ -585,4 +573,18 @@ a {
 
 .scroll-x::-webkit-scrollbar {
   display: none;
+}
+
+/* Login Page Utilities */
+.login-image-panel {
+  display: none !important;
+}
+
+@media (min-width: 768px) {
+  .login-image-panel {
+    display: block !important;
+  }
+  .mobile-only-logo {
+    display: none !important;
+  }
 }

@@ -33,19 +33,20 @@ export default function RecommendationPanel({
 
   return (
     <section className="card card-pad" aria-labelledby="advice-heading">
-      <h2 id="advice-heading" className="label">
+      <h2 id="advice-heading" className="label" style={{ marginBottom: 20 }}>
         {healthy ? "Keeping it healthy" : "Suggested treatment"}
       </h2>
 
       {!trustworthy && (
         <p
           style={{
-            fontSize: 13,
-            margin: "10px 0 0",
-            padding: "9px 11px",
-            borderRadius: "var(--radius-sm)",
+            fontSize: 14,
+            margin: "0 0 20px 0",
+            padding: "12px 16px",
+            borderRadius: "var(--radius-md)",
             background: "var(--moderate-soft)",
             color: "var(--moderate)",
+            fontWeight: 500,
           }}
         >
           Shown for completeness only. The current model is untrained, so the
@@ -56,10 +57,10 @@ export default function RecommendationPanel({
       <ol
         style={{
           listStyle: "none",
-          margin: "12px 0 0",
+          margin: 0,
           padding: 0,
           display: "grid",
-          gap: 2,
+          gap: 10,
           counterReset: "step",
         }}
       >
@@ -69,24 +70,27 @@ export default function RecommendationPanel({
             style={{
               display: "grid",
               gridTemplateColumns: "auto 1fr",
-              gap: 10,
+              gap: 14,
               alignItems: "flex-start",
-              padding: "9px 10px",
-              borderRadius: "var(--radius-sm)",
+              padding: "16px",
+              borderRadius: "var(--radius-md)",
+              background: "var(--surface-2)",
+              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.02)",
             }}
           >
             <span
               aria-hidden="true"
               style={{
-                width: 6,
-                height: 6,
-                marginTop: 7,
+                width: 10,
+                height: 10,
+                marginTop: 6,
                 borderRadius: "50%",
                 background: URGENCY_COLOR[recommendation.urgency],
                 flex: "none",
+                boxShadow: `0 0 0 4px color-mix(in srgb, ${URGENCY_COLOR[recommendation.urgency]} 20%, transparent)`,
               }}
             />
-            <span style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+            <span style={{ fontSize: 14.5, lineHeight: 1.5, color: "var(--text)" }}>
               {recommendation.text}
             </span>
           </li>
@@ -94,14 +98,16 @@ export default function RecommendationPanel({
       </ol>
 
       {!healthy && (
-        <p
-          className="dim"
-          style={{ fontSize: 11.5, marginTop: 12, lineHeight: 1.45 }}
-        >
-          General guidance only. Confirm the diagnosis and any chemical
-          treatment with a local agricultural extension service before applying
-          it — product availability, dosage and regulations vary by region.
-        </p>
+        <div style={{ marginTop: 24, padding: "16px", borderRadius: "var(--radius-md)", border: "1.5px dashed var(--border-strong)" }}>
+          <p
+            className="dim"
+            style={{ fontSize: 12.5, lineHeight: 1.5, fontWeight: 500 }}
+          >
+            General guidance only. Confirm the diagnosis and any chemical
+            treatment with a local agricultural extension service before applying
+            it — product availability, dosage and regulations vary by region.
+          </p>
+        </div>
       )}
     </section>
   );
