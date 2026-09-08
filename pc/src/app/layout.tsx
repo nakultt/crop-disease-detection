@@ -1,12 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Noto_Sans, JetBrains_Mono } from "next/font/google";
 import { THEME_BOOT_SCRIPT } from "./components/ThemeToggle";
+import AppShell from "./components/AppShell";
+import { LanguageProvider } from "./lib/i18n/LanguageContext";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const notoSans = Noto_Sans({
+  variable: "--font-noto-sans",
   subsets: ["latin"],
   display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -47,7 +50,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${notoSans.variable} ${jetbrainsMono.variable}`}>
       <head>
         {/* Applies the stored theme before first paint, so there is no flash of
             the wrong palette on load. */}
@@ -56,7 +59,13 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <LanguageProvider>
+          <AppShell>
+            {children}
+          </AppShell>
+        </LanguageProvider>
+      </body>
     </html>
   );
 }

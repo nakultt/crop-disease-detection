@@ -36,7 +36,7 @@ export default function DiagnosisCard({
   return (
     <section className="card card-pad" aria-labelledby="diagnosis-heading" style={{ borderTop: "6px solid var(--primary)" }}>
       <h2 id="diagnosis-heading" className="label" style={{ marginBottom: 20 }}>
-        Detection Result
+        Disease Detected
       </h2>
 
       <div

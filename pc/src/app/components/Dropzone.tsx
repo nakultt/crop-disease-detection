@@ -19,11 +19,14 @@ function usable(file: File): boolean {
  * Image intake: drag-and-drop, file picker, camera capture, and clipboard paste.
  * Redesigned for the new premium agricultural AI aesthetic.
  */
+import { useLanguage } from "../lib/i18n/LanguageContext";
+
 export default function Dropzone({
   onFiles,
   disabled,
   compact,
 }: DropzoneProps) {
+  const { t } = useLanguage();
   const [dragging, setDragging] = useState(false);
   const [rejected, setRejected] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -152,10 +155,10 @@ export default function Dropzone({
 
         <div>
           <div style={{ fontWeight: 600, fontSize: compact ? 16 : 22, color: "var(--text)", letterSpacing: "-0.01em" }}>
-            {dragging ? "Drop to analyse" : "Upload Leaf Image"}
+            {dragging ? t("scan.dropToAnalyze") || "Drop to analyse" : t("scan.uploadLeaf") || "Upload Leaf Image"}
           </div>
           <div className="dim" style={{ fontSize: compact ? 13 : 15, marginTop: 4 }}>
-            Drag & drop, click to browse, or paste image
+            {t("scan.dragDrop") || "Drag & drop, click to browse, or paste image"}
           </div>
         </div>
 
@@ -216,7 +219,7 @@ export default function Dropzone({
                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
               </svg>
-              Paste Image
+              {t("scan.pasteImage") || "Paste Image"}
             </button>
 
             <button
@@ -248,7 +251,7 @@ export default function Dropzone({
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                 <circle cx="12" cy="13" r="4" />
               </svg>
-              Take Photo
+              {t("scan.takePhoto") || "Take Photo"}
             </button>
           </div>
         )}
@@ -259,7 +262,7 @@ export default function Dropzone({
           className="dim"
           style={{ fontSize: 13, marginTop: 16, textAlign: "center" }}
         >
-          Images are analysed on your device and never uploaded.
+          {t("scan.privacyNote") || "Images are analysed on your device and never uploaded."}
         </p>
       )}
 

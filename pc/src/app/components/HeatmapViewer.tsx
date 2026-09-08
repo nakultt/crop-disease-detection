@@ -76,7 +76,7 @@ export default function HeatmapViewer({
             className="label"
             style={{ marginBottom: 6 }}
           >
-            Why this prediction?
+            Why did PlantGuard make this prediction?
           </h2>
           <p className="dim" style={{ fontSize: 13, lineHeight: 1.5 }}>
             {exact

@@ -8,7 +8,6 @@ import HeatmapViewer from "../components/HeatmapViewer";
 import ModelStatus from "../components/ModelStatus";
 import RecommendationPanel from "../components/RecommendationPanel";
 import SeverityGauge from "../components/SeverityGauge";
-import ThemeToggle from "../components/ThemeToggle";
 import {
   backendLabel,
   camForClass,
@@ -19,6 +18,7 @@ import {
   predict,
 } from "../lib/inference";
 import { displayName, ManifestError, type ModelManifest } from "../lib/manifest";
+import { useLanguage } from "../lib/i18n/LanguageContext";
 
 interface Analysis {
   id: string;
@@ -34,6 +34,7 @@ interface LoadError {
 }
 
 export default function Home() {
+  const { t } = useLanguage();
   const [manifest, setManifest] = useState<ModelManifest | null>(null);
   const [progress, setProgress] = useState<LoadProgress | null>(null);
   const [loadError, setLoadError] = useState<LoadError | null>(null);
@@ -143,143 +144,17 @@ export default function Home() {
   const camGrid = active ? camForClass(active.result, camIndex) : null;
 
   return (
-    <>
-      <a
-        href="#main"
-        className="btn btn-secondary"
-        style={{
-          position: "absolute",
-          left: 12,
-          top: -60,
-          zIndex: 20,
-          transition: "top var(--ease-out)",
-        }}
-        onFocus={(event) => {
-          event.currentTarget.style.top = "12px";
-        }}
-        onBlur={(event) => {
-          event.currentTarget.style.top = "-60px";
-        }}
-      >
-        Skip to content
-      </a>
-
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          height: "var(--header-h)",
-          display: "flex",
-          alignItems: "center",
-          background: "color-mix(in srgb, var(--bg) 85%, transparent)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          borderBottom: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
-        }}
-      >
-        <div
-          className="shell"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            width: "100%",
-          }}
-        >
-          <span
-            aria-hidden="true"
-            style={{
-              display: "grid",
-              placeItems: "center",
-              width: 36,
-              height: 36,
-              borderRadius: "var(--radius-sm)",
-              background: "var(--primary)",
-              color: "var(--primary-on)",
-              boxShadow: "var(--shadow-1)",
-            }}
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M4 16c0-6 4-10 12-11 0 8-4 12-9 12a5 5 0 0 1-3-1Z" />
-              <path d="M4 16c2-4 5-6.5 9-8" />
-            </svg>
-          </span>
-
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontWeight: 660,
-                fontSize: 18,
-                letterSpacing: "-0.015em",
-                color: "var(--text)",
-              }}
-            >
-              PlantGuard
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginLeft: "auto",
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
-            {analyses.length > 0 && (
-              <button type="button" className="btn btn-ghost" onClick={reset}>
-                Clear
-              </button>
-            )}
-            <ThemeToggle />
-            <Link href="/" className="btn btn-secondary" style={{ height: 36, padding: "0 16px", fontSize: 13, minHeight: 36 }}>
-              Log Out
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main id="main" className="shell" style={{ paddingBlock: "48px 80px" }}>
-        {analyses.length === 0 && (
-          <section style={{ textAlign: "center", padding: "40px 0 64px" }}>
-            <h1
-              style={{
-                fontSize: "clamp(36px, 6vw, 52px)",
-                fontWeight: 700,
-                letterSpacing: "-0.03em",
-                lineHeight: 1.05,
-                maxWidth: "20ch",
-                marginInline: "auto",
-                color: "var(--text)",
-              }}
-            >
-              Detect plant diseases from a leaf photograph.
-            </h1>
-            <p
-              className="muted"
-              style={{
-                fontSize: 18,
-                marginTop: 24,
-                maxWidth: "52ch",
-                marginInline: "auto",
-                lineHeight: 1.6,
-              }}
-            >
-              PlantGuard is a smart plant disease detection tool powered by AI. Upload a leaf photograph to analyze its health.
-            </p>
-          </section>
+    <main id="main" className="shell" style={{ paddingBlock: "32px 80px", maxWidth: "800px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>{t("scan.title")}</h1>
+        {analyses.length > 0 && (
+          <button type="button" className="btn btn-ghost" onClick={reset} style={{ fontSize: 14 }}>
+            {t("scan.clear")}
+          </button>
         )}
+      </div>
+
+      <div style={{ display: "grid", gap: 24, margin: "0 auto" }}>
 
         <div style={{ display: "grid", gap: 24, maxWidth: analyses.length === 0 ? "800px" : "none", margin: "0 auto" }}>
           <ModelStatus
@@ -312,7 +187,7 @@ export default function Home() {
               }}
             >
               <span className="spinner" style={{ color: "var(--primary)" }} />
-              PlantGuard is analyzing your leaf...
+              {t("scan.analyzing") || "PlantGuard is analyzing your leaf..."}
             </div>
           )}
 
@@ -341,6 +216,7 @@ export default function Home() {
                 const chosen = analyses.find((a) => a.id === id);
                 setSelectedClass(chosen?.result.disease.index ?? null);
               }}
+              t={t}
             />
           )}
 
@@ -392,37 +268,8 @@ export default function Home() {
             </div>
           )}
         </div>
-      </main>
-
-      <footer
-        style={{
-          borderTop: "1px solid var(--border)",
-          paddingBlock: 32,
-          marginTop: "auto",
-        }}
-      >
-        <div
-          className="shell dim"
-          style={{
-            fontSize: 13,
-            display: "flex",
-            gap: 16,
-            flexWrap: "wrap",
-            justifyContent: "space-between",
-          }}
-        >
-          <span>
-            Runs entirely in your browser. Photographs never leave your device.
-          </span>
-          {manifest && (
-            <span className="mono">
-              {manifest.backbone.split(".")[0]} ·{" "}
-              {manifest.classes.disease.length} classes
-            </span>
-          )}
-        </div>
-      </footer>
-    </>
+      </div>
+    </main>
   );
 }
 
@@ -440,15 +287,17 @@ function HistoryStrip({
   analyses,
   activeId,
   onSelect,
+  t,
 }: {
   analyses: Analysis[];
   activeId: string | null;
   onSelect: (id: string) => void;
+  t: (k: string) => string;
 }) {
   return (
     <section aria-label="Previous analyses">
       <h2 className="label" style={{ marginBottom: 12 }}>
-        This session
+        {t("scan.thisSession") || "This session"}
       </h2>
       <div
         className="scroll-x"
