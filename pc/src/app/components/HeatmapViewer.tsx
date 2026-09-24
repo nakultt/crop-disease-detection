@@ -5,24 +5,59 @@ import {
   COLORMAP_NAMES,
   type ColormapName,
   colormapLut,
-  describeHotspot,
+  type HotspotSummary,
   normalizeCam,
   renderOverlay,
+  summarizeHotspot,
 } from "../lib/cam";
+import { useLanguage } from "../lib/i18n/LanguageContext";
+import type { Translate, TranslationKey } from "../lib/i18n/types";
 
 type ViewMode = "overlay" | "split";
 
 interface HeatmapViewerProps {
-  source: HTMLCanvasElement;
+  /** The square image the model saw; `null` when no photo was kept. */
+  source: HTMLCanvasElement | null;
   cam: Float32Array;
   gridH: number;
   gridW: number;
+  /** Name of the class this heatmap explains, for the caption. */
   explaining: string;
   exact: boolean;
 }
 
 const CANVAS_SIZE = 512;
 
+function describe(summary: HotspotSummary, t: Translate): string {
+  if (summary.spread === "none") return t("cam.noFocus");
+  const region = t(`cam.region.${summary.region}` as TranslationKey);
+  const template: TranslationKey =
+    summary.spread === "tight"
+      ? "cam.focusTight"
+      : summary.spread === "focused"
+        ? "cam.focus"
+        : "cam.focusBroad";
+  return t(template, region);
+}
+
+/** A blank square to draw the heatmap on when there is no photo. */
+function placeholderCanvas(): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = CANVAS_SIZE;
+  canvas.height = CANVAS_SIZE;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "#1e2922";
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  }
+  return canvas;
+}
+
+/**
+ * Shows where the model looked. The heatmap is read straight out of the ONNX
+ * graph, so it reflects the actual evidence behind the prediction rather than
+ * a colour heuristic applied to the photograph.
+ */
 export default function HeatmapViewer({
   source,
   cam,
@@ -31,6 +66,7 @@ export default function HeatmapViewer({
   explaining,
   exact,
 }: HeatmapViewerProps) {
+  const { t } = useLanguage();
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const plainRef = useRef<HTMLCanvasElement>(null);
 
@@ -40,24 +76,35 @@ export default function HeatmapViewer({
 
   const normalized = useMemo(() => normalizeCam(cam), [cam]);
   const description = useMemo(
-    () => describeHotspot(normalized, gridH, gridW),
-    [normalized, gridH, gridW],
+    () => describe(summarizeHotspot(normalized, gridH, gridW), t),
+    [normalized, gridH, gridW, t],
   );
 
   useEffect(() => {
     const canvas = overlayRef.current;
     if (!canvas) return;
-    renderOverlay(canvas, source, normalized, gridH, gridW, colormap, opacity);
+    renderOverlay(
+      canvas,
+      source ?? placeholderCanvas(),
+      normalized,
+      gridH,
+      gridW,
+      colormap,
+      source ? opacity : Math.max(opacity, 0.9),
+    );
   }, [source, normalized, gridH, gridW, colormap, opacity]);
 
   useEffect(() => {
     const canvas = plainRef.current;
-    if (!canvas || mode !== "split") return;
+    if (!canvas || mode !== "split" || !source) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
   }, [source, mode]);
+
+  const splitAvailable = source !== null;
+  const effectiveMode = splitAvailable ? mode : "overlay";
 
   return (
     <section className="card card-pad" aria-labelledby="heatmap-heading">
@@ -70,60 +117,64 @@ export default function HeatmapViewer({
           marginBottom: 20,
         }}
       >
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ minWidth: 0, flex: "1 1 240px" }}>
           <h2
             id="heatmap-heading"
             className="label"
             style={{ marginBottom: 6 }}
           >
-            Why did PlantGuard make this prediction?
+            {t("cam.title")}
           </h2>
           <p className="dim" style={{ fontSize: 13, lineHeight: 1.5 }}>
-            {exact
-              ? "The highlighted regions show the areas that contributed to the prediction"
-              : "Approximate activation map for this prediction"} for{" "}
-            <strong style={{ color: "var(--text)", fontWeight: 660 }}>
+            {exact ? t("cam.exactDesc") : t("cam.approxDesc")} {t("cam.for")}{" "}
+            <strong style={{ color: "var(--text)", fontWeight: 650 }}>
               {explaining}
             </strong>
           </p>
         </div>
 
-        <fieldset
-          className="segmented"
-          style={{ border: 0, padding: 4, margin: 0 }}
-        >
-          <legend className="sr-only">View mode</legend>
-          {(["overlay", "split"] as ViewMode[]).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={mode === value}
-              onClick={() => setMode(value)}
-            >
-              {value === "overlay" ? "Overlay" : "Side by side"}
-            </button>
-          ))}
-        </fieldset>
+        {splitAvailable && (
+          <fieldset className="segmented" style={{ border: 0, margin: 0 }}>
+            <legend className="sr-only">{t("cam.viewMode")}</legend>
+            {(["overlay", "split"] as ViewMode[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={mode === value}
+                onClick={() => setMode(value)}
+              >
+                {value === "overlay" ? t("cam.overlay") : t("cam.split")}
+              </button>
+            ))}
+          </fieldset>
+        )}
       </header>
+
+      {!source && (
+        <p className="alert alert-info" style={{ marginBottom: 16 }}>
+          {t("cam.noPhoto")}
+        </p>
+      )}
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: mode === "split" ? "1fr 1fr" : "1fr",
+          gridTemplateColumns: effectiveMode === "split" ? "1fr 1fr" : "1fr",
           gap: 16,
         }}
       >
-        {mode === "split" && (
+        {effectiveMode === "split" && (
           <figure style={{ margin: 0 }}>
             <canvas
               ref={plainRef}
               width={CANVAS_SIZE}
               height={CANVAS_SIZE}
-              aria-label="The leaf photograph as the model received it, without a heatmap."
+              role="img"
+              aria-label={t("cam.inputAria")}
               style={canvasStyle}
             />
             <figcaption className="dim" style={captionStyle}>
-              Original Image
+              {t("cam.original")}
             </figcaption>
           </figure>
         )}
@@ -134,11 +185,11 @@ export default function HeatmapViewer({
             width={CANVAS_SIZE}
             height={CANVAS_SIZE}
             role="img"
-            aria-label={`Heatmap over the leaf photograph. ${description}`}
+            aria-label={t("cam.aria", description)}
             style={canvasStyle}
           />
           <figcaption className="dim" style={captionStyle}>
-            {mode === "split" ? "AI Evidence" : description}
+            {effectiveMode === "split" ? t("cam.evidence") : description}
           </figcaption>
         </figure>
       </div>
@@ -150,7 +201,7 @@ export default function HeatmapViewer({
           gap: 24,
           flexWrap: "wrap",
           marginTop: 24,
-          padding: "16px",
+          padding: 16,
           background: "var(--surface-2)",
           borderRadius: "var(--radius-lg)",
         }}
@@ -165,8 +216,12 @@ export default function HeatmapViewer({
               marginBottom: 10,
             }}
           >
-            <span>Overlay Intensity</span>
-            <output className="tnum" htmlFor="heatmap-opacity" style={{ color: "var(--primary)" }}>
+            <span>{t("cam.intensity")}</span>
+            <output
+              className="tnum"
+              htmlFor="heatmap-opacity"
+              style={{ color: "var(--primary)" }}
+            >
               {Math.round(opacity * 100)}%
             </output>
           </label>
@@ -184,7 +239,7 @@ export default function HeatmapViewer({
 
         <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
           <legend className="label" style={{ marginBottom: 10 }}>
-            Colour scale
+            {t("cam.scale")}
           </legend>
           <div className="segmented">
             {COLORMAP_NAMES.map((name) => (
@@ -202,7 +257,11 @@ export default function HeatmapViewer({
         </fieldset>
       </div>
 
-      <ScaleLegend colormap={colormap} />
+      <ScaleLegend
+        colormap={colormap}
+        little={t("cam.little")}
+        strong={t("cam.strong")}
+      />
     </section>
   );
 }
@@ -224,12 +283,21 @@ const captionStyle: React.CSSProperties = {
   textAlign: "center",
 };
 
-function ScaleLegend({ colormap }: { colormap: ColormapName }) {
+/** A gradient bar so the colours read as values, not decoration. */
+function ScaleLegend({
+  colormap,
+  little,
+  strong,
+}: {
+  colormap: ColormapName;
+  little: string;
+  strong: string;
+}) {
   const gradient = useMemo(() => {
     const stops: string[] = [];
     for (let i = 0; i <= 10; i++) {
-      const t = i / 10;
-      stops.push(`${sampleCss(colormap, t)} ${t * 100}%`);
+      const at = i / 10;
+      stops.push(`${sampleCss(colormap, at)} ${at * 100}%`);
     }
     return `linear-gradient(90deg, ${stops.join(", ")})`;
   }, [colormap]);
@@ -242,7 +310,8 @@ function ScaleLegend({ colormap }: { colormap: ColormapName }) {
           height: 10,
           borderRadius: "var(--radius-full)",
           background: gradient,
-          border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
+          border:
+            "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
         }}
       />
       <div
@@ -250,20 +319,21 @@ function ScaleLegend({ colormap }: { colormap: ColormapName }) {
         style={{
           display: "flex",
           justifyContent: "space-between",
+          gap: 12,
           fontSize: 12,
           fontWeight: 600,
           marginTop: 8,
         }}
       >
-        <span>Little influence</span>
-        <span>Strong influence on prediction</span>
+        <span>{little}</span>
+        <span style={{ textAlign: "right" }}>{strong}</span>
       </div>
     </div>
   );
 }
 
-function sampleCss(colormap: ColormapName, t: number): string {
+function sampleCss(colormap: ColormapName, at: number): string {
   const lut = colormapLut(colormap);
-  const i = Math.round(t * 255) * 3;
+  const i = Math.round(at * 255) * 3;
   return `rgb(${lut[i]} ${lut[i + 1]} ${lut[i + 2]})`;
 }

@@ -176,12 +176,37 @@ export function colorizeHeatmap(
   return new ImageData(rgba, width, height);
 }
 
-/** Where the heat concentrates, in words, for the canvas `aria-label`. */
-export function describeHotspot(
+export type HotspotRegion =
+  | "upperLeft"
+  | "upperCentre"
+  | "upperRight"
+  | "middleLeft"
+  | "centre"
+  | "middleRight"
+  | "lowerLeft"
+  | "lowerCentre"
+  | "lowerRight";
+
+export type HotspotSummary =
+  | { spread: "none" }
+  | { spread: "tight" | "focused" | "broad"; region: HotspotRegion };
+
+const REGIONS: HotspotRegion[][] = [
+  ["upperLeft", "upperCentre", "upperRight"],
+  ["middleLeft", "centre", "middleRight"],
+  ["lowerLeft", "lowerCentre", "lowerRight"],
+];
+
+/**
+ * Where the heat concentrates, as data — the peak's ninth of the grid, and how
+ * much of the total activation sits in the top quarter of cells. Rendered
+ * into words (in any language) by the caller.
+ */
+export function summarizeHotspot(
   grid: Float32Array,
   h: number,
   w: number,
-): string {
+): HotspotSummary {
   let best = -Infinity;
   let bestIndex = 0;
   let mass = 0;
@@ -194,37 +219,54 @@ export function describeHotspot(
     }
   }
 
-  if (mass < 1e-6) {
-    return "The model did not concentrate on any particular region.";
-  }
+  if (mass < 1e-6) return { spread: "none" };
 
   const row = Math.floor(bestIndex / w);
   const col = bestIndex % w;
-  const vertical =
-    row < h / 3 ? "upper" : row < (2 * h) / 3 ? "middle" : "lower";
-  const horizontal =
-    col < w / 3 ? "left" : col < (2 * w) / 3 ? "centre" : "right";
+  const band = (value: number, size: number) =>
+    value < size / 3 ? 0 : value < (2 * size) / 3 ? 1 : 2;
 
-  const band =
-    vertical === "middle" && horizontal === "centre"
-      ? "the centre"
-      : `the ${vertical} ${horizontal}`;
-
-  // How concentrated is the attention? Share of total activation in the top 25%.
   const sorted = Array.from(grid).sort((a, b) => b - a);
   const topQuarter = sorted
     .slice(0, Math.max(1, Math.floor(sorted.length / 4)))
     .reduce((sum, v) => sum + v, 0);
   const concentration = topQuarter / mass;
 
-  const spread =
-    concentration > 0.7
-      ? "tightly focused on"
-      : concentration > 0.5
-        ? "focused on"
-        : "spread broadly, leaning toward";
+  return {
+    spread:
+      concentration > 0.7 ? "tight" : concentration > 0.5 ? "focused" : "broad",
+    region: REGIONS[band(row, h)][band(col, w)],
+  };
+}
 
-  return `Model attention is ${spread} ${band} of the leaf.`;
+const ENGLISH_REGIONS: Record<HotspotRegion, string> = {
+  upperLeft: "the upper left",
+  upperCentre: "the upper centre",
+  upperRight: "the upper right",
+  middleLeft: "the middle left",
+  centre: "the centre",
+  middleRight: "the middle right",
+  lowerLeft: "the lower left",
+  lowerCentre: "the lower centre",
+  lowerRight: "the lower right",
+};
+
+/** Where the heat concentrates, in English. */
+export function describeHotspot(
+  grid: Float32Array,
+  h: number,
+  w: number,
+): string {
+  const summary = summarizeHotspot(grid, h, w);
+  if (summary.spread === "none") {
+    return "The model did not concentrate on any particular region.";
+  }
+  const spread = {
+    tight: "tightly focused on",
+    focused: "focused on",
+    broad: "spread broadly, leaning toward",
+  }[summary.spread];
+  return `Model attention is ${spread} ${ENGLISH_REGIONS[summary.region]} of the leaf.`;
 }
 
 /**

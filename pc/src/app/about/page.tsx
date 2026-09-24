@@ -1,51 +1,161 @@
-"use client";
+import type { Metadata } from "next";
+import { getEnv } from "@/server/env";
+import { getServerManifest } from "@/server/model-manifest";
+import {
+  AlertIcon,
+  CameraIcon,
+  CheckCircleIcon,
+  LeafIcon,
+  MailIcon,
+  SparkIcon,
+} from "../components/icons";
+import { getTranslator } from "../lib/i18n/server";
+import type { TranslationKey } from "../lib/i18n/types";
+import { formatBytes } from "../lib/manifest";
 
-import { useLanguage } from "../lib/i18n/LanguageContext";
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslator();
+  return { title: t("about.title"), description: t("about.p1Desc") };
+}
 
-export default function AboutPage() {
-  const { t } = useLanguage();
+/** "Title: body" copy, split at the first colon so the title can be bold. */
+function titled(text: string): [string, string] {
+  const at = text.search(/[:：]/);
+  return at === -1
+    ? ["", text]
+    : [text.slice(0, at), text.slice(at + 1).trim()];
+}
+
+const CAPABILITIES: { key: TranslationKey; icon: typeof LeafIcon }[] = [
+  { key: "about.li1", icon: CameraIcon },
+  { key: "about.li2", icon: LeafIcon },
+  { key: "about.li3", icon: CheckCircleIcon },
+  { key: "about.li4", icon: SparkIcon },
+];
+
+export default async function AboutPage() {
+  const [t, manifest] = await Promise.all([
+    getTranslator(),
+    getServerManifest(),
+  ]);
+  const supportEmail = getEnv().SUPPORT_EMAIL;
 
   return (
-    <main className="shell" style={{ paddingBlock: "32px 80px", maxWidth: "800px" }}>
-      <header style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)" }}>{t("about.title")}</h1>
+    <main id="main" className="shell page" style={{ maxWidth: 960 }}>
+      <header className="page-header">
+        <div>
+          <span className="eyebrow">{t("about.eyebrow")}</span>
+          <h1 className="page-title" style={{ marginTop: 6 }}>
+            {t("about.title")}
+          </h1>
+        </div>
       </header>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        <section className="card card-pad" style={{ background: "var(--surface)" }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: "var(--primary)" }}>
-            {t("about.p1Title")}
-          </h2>
-          <p style={{ lineHeight: 1.6, marginBottom: 16, color: "var(--text-2)" }}>
-            {t("about.p1Desc")}
-          </p>
-          <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
-            <li><strong>{t("about.li1").split(":")[0]}:</strong> {t("about.li1").split(":")[1]}</li>
-            <li><strong>{t("about.li2").split(":")[0]}:</strong> {t("about.li2").split(":")[1]}</li>
-            <li><strong>{t("about.li3").split(":")[0]}:</strong> {t("about.li3").split(":")[1]}</li>
-            <li><strong>{t("about.li4").split(":")[0]}:</strong> {t("about.li4").split(":")[1]}</li>
-          </ul>
-        </section>
+      <section className="card card-pad about-intro">
+        <h2 className="section-title" style={{ fontSize: 22 }}>
+          {t("about.p1Title")}
+        </h2>
+        <p
+          className="muted"
+          style={{ fontSize: 16, lineHeight: 1.7, marginTop: 10 }}
+        >
+          {t("about.p1Desc")}
+        </p>
 
-        <section className="card card-pad" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--error, #e53e3e)" }}>
-              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-              <line x1="12" x2="12" y1="9" y2="13"/>
-              <line x1="12" x2="12.01" y1="17" y2="17"/>
-            </svg>
-            {t("about.p2Title")}
+        <ul className="capability-list">
+          {CAPABILITIES.map(({ key, icon: Icon }) => {
+            const [title, body] = titled(t(key));
+            return (
+              <li key={key}>
+                <span className="feature-icon" aria-hidden="true">
+                  <Icon size={20} />
+                </span>
+                <div>
+                  {title && <h3>{title}</h3>}
+                  <p>{body}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {manifest && (
+        <section
+          className="card card-pad"
+          style={{ marginTop: 20 }}
+          aria-labelledby="model-heading"
+        >
+          <h2 id="model-heading" className="section-title">
+            {t("about.modelTitle")}
           </h2>
-          <p style={{ lineHeight: 1.5, marginBottom: 16, color: "var(--text-2)" }}>
-            {t("about.p2Desc")}
-          </p>
-          <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8, color: "var(--text-3)", fontSize: 14 }}>
-            <li>{t("about.li5")}</li>
-            <li>{t("about.li6")}</li>
-            <li>{t("about.li7")}</li>
-          </ul>
+          <dl className="fact-grid">
+            <div>
+              <dt>{t("model.backbone")}</dt>
+              <dd className="mono">{manifest.backbone.split(".")[0]}</dd>
+            </div>
+            <div>
+              <dt>{t("model.size")}</dt>
+              <dd>{formatBytes(manifest.sizeBytes)}</dd>
+            </div>
+            {manifest.metrics && (
+              <>
+                <div>
+                  <dt>{t("model.accuracy")}</dt>
+                  <dd>
+                    {(manifest.metrics.diseaseAccuracy * 100).toFixed(1)}%
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t("about.testImages")}</dt>
+                  <dd>{manifest.metrics.numSamples.toLocaleString()}</dd>
+                </div>
+              </>
+            )}
+            <div>
+              <dt>{t("model.explanation")}</dt>
+              <dd>
+                {manifest.cam.exact
+                  ? t("model.exactCam")
+                  : t("model.approxCam")}
+              </dd>
+            </div>
+          </dl>
         </section>
-      </div>
+      )}
+
+      <section
+        className="card card-pad about-limits"
+        style={{ marginTop: 20 }}
+        aria-labelledby="limits-heading"
+      >
+        <h2
+          id="limits-heading"
+          className="section-title"
+          style={{ display: "flex", alignItems: "center", gap: 10 }}
+        >
+          <AlertIcon size={20} />
+          {t("about.p2Title")}
+        </h2>
+        <p className="muted" style={{ marginTop: 8 }}>
+          {t("about.p2Desc")}
+        </p>
+        <ul className="advice-list" style={{ marginTop: 12, fontSize: 14.5 }}>
+          <li>{t("about.li5")}</li>
+          <li>{t("about.li6")}</li>
+          <li>{t("about.li7")}</li>
+        </ul>
+      </section>
+
+      {supportEmail && (
+        <section className="privacy-note" style={{ marginTop: 20 }}>
+          <MailIcon size={20} />
+          <p>
+            {t("about.contact")}{" "}
+            <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
+          </p>
+        </section>
+      )}
     </main>
   );
 }

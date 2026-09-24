@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useLanguage } from "../lib/i18n/LanguageContext";
 import {
   getRecommendations,
   type Recommendation,
@@ -10,7 +11,7 @@ interface RecommendationPanelProps {
   diseaseClass: string;
   severity: string;
   healthy: boolean;
-  /** Suppress actionable advice when the model itself is unreliable. */
+  /** Flag advice as not actionable when the model itself is unreliable. */
   trustworthy: boolean;
 }
 
@@ -26,31 +27,21 @@ export default function RecommendationPanel({
   healthy,
   trustworthy,
 }: RecommendationPanelProps) {
+  const { t } = useLanguage();
   const recommendations = useMemo(
-    () => getRecommendations(diseaseClass, severity),
-    [diseaseClass, severity],
+    () => getRecommendations(diseaseClass, severity, t),
+    [diseaseClass, severity, t],
   );
 
   return (
     <section className="card card-pad" aria-labelledby="advice-heading">
       <h2 id="advice-heading" className="label" style={{ marginBottom: 20 }}>
-        {healthy ? "Keeping it healthy" : "Suggested treatment"}
+        {healthy ? t("rec.titleHealthy") : t("rec.titleDisease")}
       </h2>
 
       {!trustworthy && (
-        <p
-          style={{
-            fontSize: 14,
-            margin: "0 0 20px 0",
-            padding: "12px 16px",
-            borderRadius: "var(--radius-md)",
-            background: "var(--moderate-soft)",
-            color: "var(--moderate)",
-            fontWeight: 500,
-          }}
-        >
-          Shown for completeness only. The current model is untrained, so the
-          diagnosis these steps respond to is not real.
+        <p className="alert alert-warning" style={{ marginBottom: 20 }}>
+          {t("rec.warning")}
         </p>
       )}
 
@@ -61,36 +52,21 @@ export default function RecommendationPanel({
           padding: 0,
           display: "grid",
           gap: 10,
-          counterReset: "step",
         }}
       >
         {recommendations.map((recommendation) => (
-          <li
-            key={recommendation.text}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "auto 1fr",
-              gap: 14,
-              alignItems: "flex-start",
-              padding: "16px",
-              borderRadius: "var(--radius-md)",
-              background: "var(--surface-2)",
-              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.02)",
-            }}
-          >
+          <li key={recommendation.text} className="recommendation">
             <span
               aria-hidden="true"
+              className="recommendation-dot"
               style={{
-                width: 10,
-                height: 10,
-                marginTop: 6,
-                borderRadius: "50%",
                 background: URGENCY_COLOR[recommendation.urgency],
-                flex: "none",
                 boxShadow: `0 0 0 4px color-mix(in srgb, ${URGENCY_COLOR[recommendation.urgency]} 20%, transparent)`,
               }}
             />
-            <span style={{ fontSize: 14.5, lineHeight: 1.5, color: "var(--text)" }}>
+            <span
+              style={{ fontSize: 14.5, lineHeight: 1.5, color: "var(--text)" }}
+            >
               {recommendation.text}
             </span>
           </li>
@@ -98,16 +74,20 @@ export default function RecommendationPanel({
       </ol>
 
       {!healthy && (
-        <div style={{ marginTop: 24, padding: "16px", borderRadius: "var(--radius-md)", border: "1.5px dashed var(--border-strong)" }}>
-          <p
-            className="dim"
-            style={{ fontSize: 12.5, lineHeight: 1.5, fontWeight: 500 }}
-          >
-            General guidance only. Confirm the diagnosis and any chemical
-            treatment with a local agricultural extension service before applying
-            it — product availability, dosage and regulations vary by region.
-          </p>
-        </div>
+        <p
+          className="dim"
+          style={{
+            marginTop: 24,
+            padding: 16,
+            borderRadius: "var(--radius-md)",
+            border: "1.5px dashed var(--border-strong)",
+            fontSize: 12.5,
+            lineHeight: 1.5,
+            fontWeight: 500,
+          }}
+        >
+          {t("rec.disclaimer")}
+        </p>
       )}
     </section>
   );

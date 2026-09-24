@@ -1,59 +1,85 @@
-"use client";
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { getAuth } from "@/server/auth";
+import { requireSession, toViewer } from "@/server/session";
+import Alert from "../components/Alert";
+import { getTranslator } from "../lib/i18n/server";
+import { first, type SearchParams } from "../lib/search-params";
+import AppearanceSection from "./AppearanceSection";
+import DataSection from "./DataSection";
+import PreferencesSection from "./PreferencesSection";
+import ProfileSection from "./ProfileSection";
+import SecuritySection, { type SessionRow } from "./SecuritySection";
 
-import ThemeToggle from "../components/ThemeToggle";
-import LanguageSelector from "../components/LanguageSelector";
-import { useLanguage } from "../lib/i18n/LanguageContext";
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslator();
+  return { title: t("settings.title") };
+}
 
-export default function SettingsPage() {
-  const { t } = useLanguage();
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const session = await requireSession("/settings");
+  const viewer = toViewer(session);
+  const t = await getTranslator();
+  const params = await searchParams;
+
+  const auth = await getAuth();
+  const requestHeaders = await headers();
+  const [sessions, accounts] = await Promise.all([
+    auth.api.listSessions({ headers: requestHeaders }),
+    auth.api.listUserAccounts({ headers: requestHeaders }),
+  ]);
+
+  const hasPassword = accounts.some(
+    (account) => account.providerId === "credential",
+  );
+  const providers = accounts
+    .map((account) => account.providerId)
+    .filter((provider) => provider !== "credential");
+
+  const rows: SessionRow[] = sessions
+    .map((s) => ({
+      token: s.token,
+      current: s.id === session.session.id,
+      createdAt: new Date(s.createdAt).toISOString(),
+      updatedAt: new Date(s.updatedAt).toISOString(),
+      ipAddress: s.ipAddress ?? null,
+      userAgent: s.userAgent ?? null,
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.current) - Number(a.current) ||
+        b.updatedAt.localeCompare(a.updatedAt),
+    );
 
   return (
-    <main className="shell" style={{ paddingBlock: "32px 80px", maxWidth: "800px" }}>
-      <header style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)" }}>{t("settings.title")}</h1>
-        <p className="muted" style={{ marginTop: 8 }}>{t("settings.desc")}</p>
+    <main id="main" className="shell page" style={{ maxWidth: 880 }}>
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">{t("settings.title")}</h1>
+          <p className="page-desc">{t("settings.desc")}</p>
+        </div>
       </header>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        <section>
-          <h2 className="label" style={{ marginBottom: 12 }}>{t("settings.appearance")}</h2>
-          <div className="card card-pad" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 600 }}>{t("settings.theme")}</h3>
-              <p className="muted" style={{ fontSize: 14 }}>{t("settings.themeDesc")}</p>
-            </div>
-            <ThemeToggle />
-          </div>
-        </section>
+      {first(params.emailChanged) === "1" && (
+        <div style={{ marginBottom: 20 }}>
+          <Alert tone="success">{t("settings.emailChangeDone")}</Alert>
+        </div>
+      )}
 
-        <section>
-          <h2 className="label" style={{ marginBottom: 12 }}>{t("settings.language")}</h2>
-          <div className="card card-pad">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 600 }}>{t("settings.displayLanguage")}</h3>
-                <p className="muted" style={{ fontSize: 14 }}>{t("settings.displayLanguageDesc")}</p>
-              </div>
-            </div>
-            
-            <LanguageSelector />
-          </div>
-        </section>
-
-        <section>
-          <h2 className="label" style={{ marginBottom: 12 }}>{t("settings.privacy")}</h2>
-          <div className="card card-pad" style={{ background: "var(--surface-2)" }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
-               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--primary)" }}>
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>
-              </svg>
-              {t("settings.localProcessing")}
-            </h3>
-            <p className="muted" style={{ fontSize: 14, lineHeight: 1.5 }}>
-              {t("settings.localProcessingDesc")}
-            </p>
-          </div>
-        </section>
+      <div className="settings-stack">
+        <ProfileSection viewer={viewer} />
+        <PreferencesSection viewer={viewer} />
+        <AppearanceSection />
+        <SecuritySection
+          hasPassword={hasPassword}
+          providers={providers}
+          sessions={rows}
+        />
+        <DataSection hasPassword={hasPassword} />
       </div>
     </main>
   );

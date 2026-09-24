@@ -1,43 +1,40 @@
 "use client";
 
-import Sidebar from "./Sidebar";
-import MobileNav from "./MobileNav";
 import { usePathname } from "next/navigation";
+import { useLanguage } from "../lib/i18n/LanguageContext";
+import { AUTH_PREFIXES, matchesPrefix } from "../lib/routes";
+import type { Viewer } from "../lib/viewer";
+import MobileNav from "./MobileNav";
+import PublicShell from "./PublicShell";
+import Sidebar from "./Sidebar";
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+/**
+ * Chooses the chrome for the current page:
+ * - auth screens bring their own layout;
+ * - a signed-in user gets the sidebar (desktop) and tab bar (mobile);
+ * - everyone else gets the public header and footer.
+ */
+export default function AppShell({
+  viewer,
+  children,
+}: {
+  viewer: Viewer | null;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
+  const { t } = useLanguage();
 
-  // If we are on the scan page, we might want to hide mobile nav to give more space for the camera
-  // For now we'll keep it, but it's easy to adjust
-  const isScanPage = pathname === "/scan";
+  if (matchesPrefix(pathname, AUTH_PREFIXES)) return <>{children}</>;
+  if (!viewer) return <PublicShell>{children}</PublicShell>;
 
   return (
-    <div className="app-layout" style={{ display: "flex", minHeight: "100dvh", width: "100%" }}>
-      <Sidebar />
-      <div 
-        className="main-content" 
-        style={{ 
-          flex: 1, 
-          display: "flex", 
-          flexDirection: "column",
-          // On mobile, padding bottom for the nav. On desktop, margin left for sidebar.
-          // We handle this via CSS in globals.css or inline styles here.
-        }}
-      >
-        <style dangerouslySetInnerHTML={{__html: `
-          .main-content {
-            padding-bottom: 72px; /* Mobile Nav */
-          }
-          @media (min-width: 768px) {
-            .main-content {
-              margin-left: var(--sidebar-w);
-              padding-bottom: 0;
-            }
-          }
-        `}} />
-        <div style={{ flex: 1, position: "relative" }}>
-          {children}
-        </div>
+    <div className="app-layout">
+      <a href="#main" className="skip-link">
+        {t("nav.skip")}
+      </a>
+      <Sidebar viewer={viewer} />
+      <div className="main-content">
+        <div style={{ flex: 1, position: "relative" }}>{children}</div>
       </div>
       <MobileNav />
     </div>

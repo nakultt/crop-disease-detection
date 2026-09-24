@@ -1,167 +1,167 @@
 /**
  * Treatment recommendations keyed by disease class and severity level.
+ *
+ * Each tip is a translation key (English text lives in `i18n/locales/en.ts`),
+ * so advice reaches farmers in their own language. Listing the keys
+ * explicitly, rather than building them from strings, lets the compiler catch
+ * a missing tip.
  */
 
+import type { Translate, TranslationKey } from "./i18n/types";
 import { isHealthy } from "./manifest";
 
-const DISEASE_RECOMMENDATIONS: Record<string, string[]> = {
-  Apple___Apple_scab: [
-    "Apply fungicide containing captan or myclobutanil.",
-    "Rake and destroy fallen leaves in autumn.",
-    "Prune trees to improve air circulation.",
-  ],
+const DISEASE_ADVICE: Record<string, TranslationKey[]> = {
+  Apple___Apple_scab: ["rec.appleScab.1", "rec.appleScab.2", "rec.appleScab.3"],
   Apple___Black_rot: [
-    "Remove mummified fruits and cankers.",
-    "Apply fungicide during early bloom.",
-    "Maintain tree vigor with proper fertilization.",
+    "rec.appleBlackRot.1",
+    "rec.appleBlackRot.2",
+    "rec.appleBlackRot.3",
   ],
   Apple___Cedar_apple_rust: [
-    "Apply fungicide at pink bud stage.",
-    "Remove nearby juniper/cedar trees if possible.",
-    "Use resistant apple varieties.",
-  ],
-  "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot": [
-    "Apply foliar fungicide (strobilurin or triazole).",
-    "Rotate crops away from corn for 1–2 years.",
-    "Improve field drainage and air flow.",
-  ],
-  "Corn_(maize)___Common_rust_": [
-    "Apply foliar fungicide if infection is early.",
-    "Use resistant corn varieties in future plantings.",
-    "Monitor humidity – rust thrives in moist conditions.",
-  ],
-  "Corn_(maize)___Northern_Leaf_Blight": [
-    "Apply fungicide at early infection stages.",
-    "Plant resistant hybrids.",
-    "Practice crop rotation with non-host crops.",
-  ],
-  Grape___Black_rot: [
-    "Apply mancozeb or myclobutanil fungicide.",
-    "Remove mummified berries and infected canes.",
-    "Prune for good air circulation.",
-  ],
-  "Grape___Esca_(Black_Measles)": [
-    "No known cure – manage through pruning.",
-    "Remove and destroy infected wood.",
-    "Apply wound protectants after pruning.",
-  ],
-  "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)": [
-    "Apply copper-based fungicide.",
-    "Remove infected leaves promptly.",
-    "Ensure good canopy management.",
-  ],
-  "Orange___Haunglongbing_(Citrus_greening)": [
-    "No known cure – manage psyllid vector.",
-    "Apply systemic insecticide for psyllid control.",
-    "Remove and destroy severely infected trees.",
-    "Use certified disease-free nursery stock.",
-  ],
-  Peach___Bacterial_spot: [
-    "Apply copper-based bactericide in dormant season.",
-    "Use resistant peach varieties.",
-    "Avoid overhead irrigation.",
-  ],
-  "Pepper,_bell___Bacterial_spot": [
-    "Apply copper-based bactericide.",
-    "Use disease-free seeds and transplants.",
-    "Rotate crops for 2–3 years.",
-  ],
-  Potato___Early_blight: [
-    "Apply chlorothalonil or mancozeb fungicide.",
-    "Maintain proper plant nutrition.",
-    "Remove and destroy infected plant debris.",
-  ],
-  Potato___Late_blight: [
-    "Apply systemic fungicide (metalaxyl + mancozeb).",
-    "Destroy infected tubers and plant debris.",
-    "Use certified disease-free seed potatoes.",
-    "Ensure good field drainage.",
-  ],
-  Squash___Powdery_mildew: [
-    "Apply sulfur or potassium bicarbonate fungicide.",
-    "Improve air circulation between plants.",
-    "Water at base of plant, avoid wetting foliage.",
-  ],
-  Strawberry___Leaf_scorch: [
-    "Remove and destroy infected leaves.",
-    "Apply fungicide during early season.",
-    "Ensure proper plant spacing.",
-  ],
-  Tomato___Bacterial_spot: [
-    "Apply copper-based bactericide.",
-    "Use disease-free seeds and transplants.",
-    "Avoid working with wet plants.",
-  ],
-  Tomato___Early_blight: [
-    "Apply chlorothalonil or copper-based fungicide.",
-    "Mulch around plants to prevent soil splash.",
-    "Rotate crops – avoid same spot for 2 years.",
-  ],
-  Tomato___Late_blight: [
-    "Apply fungicide immediately (chlorothalonil or mancozeb).",
-    "Remove and destroy all infected plant material.",
-    "Do NOT compost infected plants.",
-    "Avoid overhead irrigation.",
-  ],
-  Tomato___Leaf_Mold: [
-    "Improve greenhouse ventilation.",
-    "Apply fungicide if severe.",
-    "Reduce humidity around plants.",
-  ],
-  Tomato___Septoria_leaf_spot: [
-    "Apply chlorothalonil or mancozeb fungicide.",
-    "Remove lower infected leaves.",
-    "Avoid overhead watering.",
-  ],
-  "Tomato___Spider_mites Two-spotted_spider_mite": [
-    "Apply miticide or insecticidal soap.",
-    "Spray plants with strong water jet to dislodge mites.",
-    "Introduce predatory mites as biological control.",
-  ],
-  Tomato___Target_Spot: [
-    "Apply chlorothalonil fungicide.",
-    "Improve air circulation.",
-    "Remove infected lower leaves.",
-  ],
-  Tomato___Tomato_Yellow_Leaf_Curl_Virus: [
-    "No chemical cure – manage whitefly vector.",
-    "Use insecticide for whitefly control.",
-    "Remove and destroy infected plants early.",
-    "Use resistant tomato varieties.",
-  ],
-  Tomato___Tomato_mosaic_virus: [
-    "No chemical cure available.",
-    "Remove and destroy infected plants.",
-    "Disinfect tools between plants.",
-    "Wash hands before handling healthy plants.",
+    "rec.appleCedarRust.1",
+    "rec.appleCedarRust.2",
+    "rec.appleCedarRust.3",
   ],
   "Cherry_(including_sour)___Powdery_mildew": [
-    "Apply sulfur-based fungicide.",
-    "Prune to improve air circulation.",
-    "Remove fallen infected leaves.",
+    "rec.cherryPowderyMildew.1",
+    "rec.cherryPowderyMildew.2",
+    "rec.cherryPowderyMildew.3",
+  ],
+  "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot": [
+    "rec.cornGrayLeafSpot.1",
+    "rec.cornGrayLeafSpot.2",
+    "rec.cornGrayLeafSpot.3",
+  ],
+  "Corn_(maize)___Common_rust_": [
+    "rec.cornCommonRust.1",
+    "rec.cornCommonRust.2",
+    "rec.cornCommonRust.3",
+  ],
+  "Corn_(maize)___Northern_Leaf_Blight": [
+    "rec.cornNorthernBlight.1",
+    "rec.cornNorthernBlight.2",
+    "rec.cornNorthernBlight.3",
+  ],
+  Grape___Black_rot: [
+    "rec.grapeBlackRot.1",
+    "rec.grapeBlackRot.2",
+    "rec.grapeBlackRot.3",
+  ],
+  "Grape___Esca_(Black_Measles)": [
+    "rec.grapeEsca.1",
+    "rec.grapeEsca.2",
+    "rec.grapeEsca.3",
+  ],
+  "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)": [
+    "rec.grapeLeafBlight.1",
+    "rec.grapeLeafBlight.2",
+    "rec.grapeLeafBlight.3",
+  ],
+  "Orange___Haunglongbing_(Citrus_greening)": [
+    "rec.citrusGreening.1",
+    "rec.citrusGreening.2",
+    "rec.citrusGreening.3",
+    "rec.citrusGreening.4",
+  ],
+  Peach___Bacterial_spot: [
+    "rec.peachBacterialSpot.1",
+    "rec.peachBacterialSpot.2",
+    "rec.peachBacterialSpot.3",
+  ],
+  "Pepper,_bell___Bacterial_spot": [
+    "rec.pepperBacterialSpot.1",
+    "rec.pepperBacterialSpot.2",
+    "rec.pepperBacterialSpot.3",
+  ],
+  Potato___Early_blight: [
+    "rec.potatoEarlyBlight.1",
+    "rec.potatoEarlyBlight.2",
+    "rec.potatoEarlyBlight.3",
+  ],
+  Potato___Late_blight: [
+    "rec.potatoLateBlight.1",
+    "rec.potatoLateBlight.2",
+    "rec.potatoLateBlight.3",
+    "rec.potatoLateBlight.4",
+  ],
+  Squash___Powdery_mildew: [
+    "rec.squashPowderyMildew.1",
+    "rec.squashPowderyMildew.2",
+    "rec.squashPowderyMildew.3",
+  ],
+  Strawberry___Leaf_scorch: [
+    "rec.strawberryLeafScorch.1",
+    "rec.strawberryLeafScorch.2",
+    "rec.strawberryLeafScorch.3",
+  ],
+  Tomato___Bacterial_spot: [
+    "rec.tomatoBacterialSpot.1",
+    "rec.tomatoBacterialSpot.2",
+    "rec.tomatoBacterialSpot.3",
+  ],
+  Tomato___Early_blight: [
+    "rec.tomatoEarlyBlight.1",
+    "rec.tomatoEarlyBlight.2",
+    "rec.tomatoEarlyBlight.3",
+  ],
+  Tomato___Late_blight: [
+    "rec.tomatoLateBlight.1",
+    "rec.tomatoLateBlight.2",
+    "rec.tomatoLateBlight.3",
+    "rec.tomatoLateBlight.4",
+  ],
+  Tomato___Leaf_Mold: [
+    "rec.tomatoLeafMold.1",
+    "rec.tomatoLeafMold.2",
+    "rec.tomatoLeafMold.3",
+  ],
+  Tomato___Septoria_leaf_spot: [
+    "rec.tomatoSeptoria.1",
+    "rec.tomatoSeptoria.2",
+    "rec.tomatoSeptoria.3",
+  ],
+  "Tomato___Spider_mites Two-spotted_spider_mite": [
+    "rec.tomatoSpiderMites.1",
+    "rec.tomatoSpiderMites.2",
+    "rec.tomatoSpiderMites.3",
+  ],
+  Tomato___Target_Spot: [
+    "rec.tomatoTargetSpot.1",
+    "rec.tomatoTargetSpot.2",
+    "rec.tomatoTargetSpot.3",
+  ],
+  Tomato___Tomato_Yellow_Leaf_Curl_Virus: [
+    "rec.tomatoYellowCurl.1",
+    "rec.tomatoYellowCurl.2",
+    "rec.tomatoYellowCurl.3",
+    "rec.tomatoYellowCurl.4",
+  ],
+  Tomato___Tomato_mosaic_virus: [
+    "rec.tomatoMosaic.1",
+    "rec.tomatoMosaic.2",
+    "rec.tomatoMosaic.3",
+    "rec.tomatoMosaic.4",
   ],
 };
 
-const SEVERITY_ADVICE: Record<string, string[]> = {
-  Mild: [
-    "Monitor the plant closely for progression.",
-    "Ensure proper spacing for air circulation.",
-  ],
-  Moderate: [
-    "Apply appropriate treatment promptly.",
-    "Remove heavily affected leaves.",
-    "Improve drainage and reduce overhead watering.",
-  ],
-  Severe: [
-    "Immediately apply targeted treatment.",
-    "Prune and destroy all infected plant parts.",
-    "Isolate affected plants to prevent spread.",
-  ],
-  Critical: [
-    "Urgently apply systemic treatment.",
-    "Consider removing the entire plant to prevent spread.",
-    "Seek professional agricultural advice immediately.",
-  ],
+const SEVERITY_ADVICE: Record<string, TranslationKey[]> = {
+  Mild: ["rec.mild.1", "rec.mild.2"],
+  Moderate: ["rec.moderate.1", "rec.moderate.2", "rec.moderate.3"],
+  Severe: ["rec.severe.1", "rec.severe.2", "rec.severe.3"],
+  Critical: ["rec.critical.1", "rec.critical.2", "rec.critical.3"],
+};
+
+const HEALTHY_ADVICE: TranslationKey[] = [
+  "rec.healthy.1",
+  "rec.healthy.2",
+  "rec.healthy.3",
+];
+
+const URGENCY: Record<string, Recommendation["urgency"]> = {
+  Mild: "info",
+  Moderate: "warning",
+  Severe: "critical",
+  Critical: "critical",
 };
 
 export interface Recommendation {
@@ -169,60 +169,39 @@ export interface Recommendation {
   urgency: "info" | "warning" | "critical";
 }
 
+/** Whether a disease class has specific advice (vs. only the generic fallback). */
+export function hasSpecificAdvice(diseaseClass: string): boolean {
+  return diseaseClass in DISEASE_ADVICE;
+}
+
+/** The advice keys for a class, disease-specific first. */
+export function recommendationKeys(
+  diseaseClass: string,
+  severity: string,
+): { key: TranslationKey; urgency: Recommendation["urgency"] }[] {
+  if (isHealthy(diseaseClass)) {
+    return HEALTHY_ADVICE.map((key) => ({ key, urgency: "info" }));
+  }
+
+  const urgency = URGENCY[severity] ?? "info";
+  const keys = [
+    ...(DISEASE_ADVICE[diseaseClass] ?? []),
+    ...(SEVERITY_ADVICE[severity] ?? []),
+  ];
+
+  if (keys.length === 0) {
+    return [{ key: "rec.fallback", urgency: "warning" }];
+  }
+  return keys.map((key) => ({ key, urgency }));
+}
+
 export function getRecommendations(
   diseaseClass: string,
   severity: string,
+  t: Translate,
 ): Recommendation[] {
-  if (isHealthy(diseaseClass)) {
-    return [
-      {
-        text: "Plant appears healthy! Continue regular care.",
-        urgency: "info",
-      },
-      {
-        text: "Maintain proper watering and fertilization schedule.",
-        urgency: "info",
-      },
-      {
-        text: "Monitor periodically for early signs of disease.",
-        urgency: "info",
-      },
-    ];
-  }
-
-  const urgencyMap: Record<string, "info" | "warning" | "critical"> = {
-    Mild: "info",
-    Moderate: "warning",
-    Severe: "critical",
-    Critical: "critical",
-  };
-  const baseUrgency = urgencyMap[severity] || "info";
-
-  const recommendations: Recommendation[] = [];
-
-  // Disease-specific recommendations
-  const diseaseRecs = DISEASE_RECOMMENDATIONS[diseaseClass];
-  if (diseaseRecs) {
-    for (const rec of diseaseRecs) {
-      recommendations.push({ text: rec, urgency: baseUrgency });
-    }
-  }
-
-  // Severity-based general advice
-  const severityRecs = SEVERITY_ADVICE[severity];
-  if (severityRecs) {
-    for (const rec of severityRecs) {
-      recommendations.push({ text: rec, urgency: baseUrgency });
-    }
-  }
-
-  // Fallback
-  if (recommendations.length === 0) {
-    recommendations.push({
-      text: "Consult a local agricultural expert for specific treatment advice.",
-      urgency: "warning",
-    });
-  }
-
-  return recommendations;
+  return recommendationKeys(diseaseClass, severity).map(({ key, urgency }) => ({
+    text: t(key),
+    urgency,
+  }));
 }

@@ -4,7 +4,7 @@
     {
       "name": "plantguard-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "pc", "exec", "--", "next", "dev", "pc", "--port", "3111"],
+      "runtimeArgs": ["--prefix", "pc", "run", "dev", "--", "--port", "3111"],
       "port": 3111
     }
   ]

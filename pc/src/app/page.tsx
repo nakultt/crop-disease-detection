@@ -1,90 +1,281 @@
-"use client";
-
+import Image from "next/image";
 import Link from "next/link";
-import { useLanguage } from "./lib/i18n/LanguageContext";
+import { redirect } from "next/navigation";
+import { getServerManifest } from "@/server/model-manifest";
+import { getViewerSafe } from "@/server/session";
+import {
+  ArrowRightIcon,
+  CameraIcon,
+  CheckCircleIcon,
+  GlobeIcon,
+  HistoryIcon,
+  LeafIcon,
+  LockIcon,
+  SparkIcon,
+} from "./components/icons";
+import { getTranslator } from "./lib/i18n/server";
+import type { TranslationKey } from "./lib/i18n/types";
+import { cropNameLabel } from "./lib/labels";
+import { cropOf } from "./lib/manifest";
 
-export default function HomePage() {
-  const { t } = useLanguage();
+const FEATURES: {
+  icon: typeof LeafIcon;
+  title: TranslationKey;
+  body: TranslationKey;
+}[] = [
+  { icon: CameraIcon, title: "landing.f1Title", body: "landing.f1Body" },
+  { icon: SparkIcon, title: "landing.f2Title", body: "landing.f2Body" },
+  { icon: LeafIcon, title: "landing.f3Title", body: "landing.f3Body" },
+  { icon: CheckCircleIcon, title: "landing.f4Title", body: "landing.f4Body" },
+  { icon: HistoryIcon, title: "landing.f5Title", body: "landing.f5Body" },
+  { icon: GlobeIcon, title: "landing.f6Title", body: "landing.f6Body" },
+];
+
+const STEPS: [TranslationKey, TranslationKey][] = [
+  ["home.step1", "home.step1Desc"],
+  ["home.step2", "home.step2Desc"],
+  ["home.step3", "home.step3Desc"],
+  ["home.step4", "home.step4Desc"],
+];
+
+const FAQ: [TranslationKey, TranslationKey][] = [
+  ["landing.q1", "landing.a1"],
+  ["landing.q2", "landing.a2"],
+  ["landing.q3", "landing.a3"],
+  ["landing.q4", "landing.a4"],
+  ["landing.q5", "landing.a5"],
+  ["landing.q6", "landing.a6"],
+];
+
+export default async function LandingPage() {
+  if (await getViewerSafe()) redirect("/dashboard");
+
+  const [t, manifest] = await Promise.all([
+    getTranslator(),
+    getServerManifest(),
+  ]);
+
+  const accuracy = manifest?.metrics
+    ? `${(manifest.metrics.diseaseAccuracy * 100).toFixed(0)}%`
+    : "97%";
+  const conditions = manifest?.classes.disease.length ?? 38;
+  const crops = [...new Set((manifest?.classes.disease ?? []).map(cropOf))];
 
   return (
-    <main style={{ padding: "32px 24px", maxWidth: "800px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "32px" }}>
-      
-      {/* Hero Section */}
-      <section style={{ textAlign: "center", paddingTop: "24px" }}>
-        <h1 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)", lineHeight: 1.1 }}>
-          {t("home.title")}
-        </h1>
-        <p className="muted" style={{ fontSize: 18, marginTop: 16, maxWidth: "50ch", marginInline: "auto", lineHeight: 1.6 }}>
-          {t("home.desc")}
-        </p>
+    <main id="main">
+      {/* Hero */}
+      <section className="landing-hero">
+        <div className="shell landing-hero-inner">
+          <div className="landing-hero-copy">
+            <span className="chip">
+              <span
+                className="dot"
+                style={{ color: "var(--accent)" }}
+                aria-hidden="true"
+              />
+              {t("landing.chip", conditions, crops.length || 14)}
+            </span>
+            <h1 className="landing-title">{t("landing.title")}</h1>
+            <p className="landing-lead">{t("landing.lead")}</p>
+            <div className="landing-ctas">
+              <Link href="/sign-up" className="btn btn-primary btn-lg">
+                {t("landing.ctaPrimary")}
+                <ArrowRightIcon size={18} />
+              </Link>
+              <Link href="/sign-in" className="btn btn-secondary btn-lg">
+                {t("nav.signIn")}
+              </Link>
+            </div>
+            <ul className="landing-trust">
+              <li>
+                <CheckCircleIcon size={16} /> {t("landing.trust1")}
+              </li>
+              <li>
+                <CheckCircleIcon size={16} /> {t("landing.trust2")}
+              </li>
+              <li>
+                <CheckCircleIcon size={16} /> {t("landing.trust3")}
+              </li>
+            </ul>
+          </div>
+
+          <div className="landing-hero-visual">
+            <div className="landing-photo">
+              <Image
+                src="/login-bg-indian.png"
+                alt={t("landing.photoAlt")}
+                fill
+                priority
+                sizes="(min-width: 960px) 44vw, 92vw"
+                style={{ objectFit: "cover" }}
+              />
+            </div>
+            <div className="mock-result" aria-hidden="true">
+              <div className="mock-heat" />
+              <div style={{ minWidth: 0 }}>
+                <div className="mock-eyebrow">{cropNameLabel("Tomato", t)}</div>
+                <div className="mock-title">{t("cond.earlyBlight")}</div>
+                <div className="mock-meta">
+                  <span className="mock-pct">99.7%</span>
+                  <span className="badge">
+                    <span
+                      className="dot"
+                      style={{ color: "var(--moderate)" }}
+                    />
+                    {t("sev.moderate")}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="mock-tip" aria-hidden="true">
+              <SparkIcon size={16} />
+              {t("landing.mockTip")}
+            </div>
+          </div>
+        </div>
       </section>
 
-      {/* Primary Scan Action */}
-      <section style={{ margin: "24px 0" }}>
-        <div className="card card-pad" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", background: "var(--primary-soft)", border: "1px solid color-mix(in srgb, var(--primary) 20%, transparent)" }}>
-          <div style={{ marginBottom: 16, color: "var(--primary)" }}>
-             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 16c0-6 4-10 12-11 0 8-4 12-9 12a5 5 0 0 1-3-1Z" />
-              <path d="M4 16c2-4 5-6.5 9-8" />
-            </svg>
+      {/* Stats band */}
+      <section className="shell" aria-label={t("landing.statsLabel")}>
+        <div className="stats-band">
+          <div>
+            <strong>{accuracy}</strong>
+            <span>{t("landing.statAccuracy")}</span>
           </div>
-          <h2 style={{ fontSize: 24, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>
-            {t("home.scanTitle")}
-          </h2>
-          <p style={{ fontSize: 15, color: "var(--text-2)", marginBottom: 24, maxWidth: "40ch" }}>
-            {t("home.scanDesc")}
-          </p>
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
-            <Link href="/scan" className="btn btn-primary" style={{ padding: "0 32px", height: 56, fontSize: 16, fontWeight: 600 }}>
-              {t("home.startScanning")}
-            </Link>
+          <div>
+            <strong>{conditions}</strong>
+            <span>{t("landing.statConditions")}</span>
           </div>
+          <div>
+            <strong>{"< 1 s"}</strong>
+            <span>{t("landing.statSpeed")}</span>
+          </div>
+          <div>
+            <strong>8</strong>
+            <span>{t("landing.statLanguages")}</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section
+        className="shell landing-section"
+        aria-labelledby="features-heading"
+      >
+        <div className="section-heading">
+          <span className="eyebrow">{t("landing.featuresEyebrow")}</span>
+          <h2 id="features-heading">{t("landing.featuresTitle")}</h2>
+          <p>{t("landing.featuresLead")}</p>
+        </div>
+        <div className="feature-grid">
+          {FEATURES.map(({ icon: Icon, title, body }) => (
+            <article key={title} className="feature-card">
+              <span className="feature-icon" aria-hidden="true">
+                <Icon size={22} />
+              </span>
+              <h3>{t(title)}</h3>
+              <p>{t(body)}</p>
+            </article>
+          ))}
         </div>
       </section>
 
       {/* How it works */}
-      <section style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.01em" }}>{t("home.howItWorks")}</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-          <StepCard number="01" title={t("home.step1")} desc={t("home.step1Desc")} />
-          <StepCard number="02" title={t("home.step2")} desc={t("home.step2Desc")} />
-          <StepCard number="03" title={t("home.step3")} desc={t("home.step3Desc")} />
-          <StepCard number="04" title={t("home.step4")} desc={t("home.step4Desc")} />
+      <section className="landing-band" aria-labelledby="how-heading">
+        <div className="shell landing-section">
+          <div className="section-heading">
+            <span className="eyebrow">{t("landing.howEyebrow")}</span>
+            <h2 id="how-heading">{t("home.howItWorks")}</h2>
+          </div>
+          <ol className="steps">
+            {STEPS.map(([title, body], i) => (
+              <li key={title} className="step">
+                <span className="step-number">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <h3>{t(title)}</h3>
+                <p>{t(body)}</p>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
-      {/* Privacy Feature */}
-      <section style={{ marginTop: 16 }}>
-        <div className="card" style={{ padding: 20, display: "flex", gap: 16, alignItems: "flex-start", background: "var(--surface-2)" }}>
-          <div style={{ color: "var(--accent)" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>
-            </svg>
-          </div>
+      {/* Crops */}
+      <section
+        className="shell landing-section"
+        aria-labelledby="crops-heading"
+      >
+        <div className="section-heading">
+          <span className="eyebrow">{t("landing.cropsEyebrow")}</span>
+          <h2 id="crops-heading">{t("landing.cropsTitle")}</h2>
+          <p>{t("landing.cropsLead")}</p>
+        </div>
+        <ul className="crop-chips">
+          {crops.map((crop) => (
+            <li key={crop}>
+              <LeafIcon size={15} />
+              {cropNameLabel(crop, t)}
+            </li>
+          ))}
+        </ul>
+        <p style={{ textAlign: "center", marginTop: 20 }}>
+          <Link href="/crops" className="link-arrow">
+            {t("landing.cropsLink")}
+            <ArrowRightIcon size={16} />
+          </Link>
+        </p>
+      </section>
+
+      {/* Privacy */}
+      <section
+        className="shell landing-section"
+        aria-labelledby="privacy-heading"
+      >
+        <div className="privacy-panel">
+          <span className="feature-icon" aria-hidden="true">
+            <LockIcon size={22} />
+          </span>
           <div>
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{t("home.privacyTitle")}</h3>
-            <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.5 }}>
-              {t("home.privacyDesc")}
-            </p>
+            <h2 id="privacy-heading">{t("landing.privacyTitle")}</h2>
+            <p>{t("landing.privacyBody")}</p>
           </div>
         </div>
       </section>
 
-      <footer style={{ marginTop: 32, paddingBottom: 32, textAlign: "center" }}>
-        <p className="dim" style={{ fontSize: 13 }}>PlantGuard v1.0 &middot; Professional Agriculture AI Platform</p>
-      </footer>
-    </main>
-  );
-}
+      {/* FAQ */}
+      <section
+        className="shell landing-section"
+        aria-labelledby="faq-heading"
+        style={{ maxWidth: 860 }}
+      >
+        <div className="section-heading">
+          <span className="eyebrow">{t("landing.faqEyebrow")}</span>
+          <h2 id="faq-heading">{t("landing.faqTitle")}</h2>
+        </div>
+        <div className="faq">
+          {FAQ.map(([question, answer]) => (
+            <details key={question}>
+              <summary>{t(question)}</summary>
+              <p>{t(answer)}</p>
+            </details>
+          ))}
+        </div>
+      </section>
 
-function StepCard({ number, title, desc }: { number: string; title: string; desc: string }) {
-  return (
-    <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)", background: "var(--primary-soft)", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%" }}>
-        {number}
-      </span>
-      <h3 style={{ fontSize: 16, fontWeight: 600 }}>{title}</h3>
-      <p style={{ fontSize: 14, color: "var(--text-2)" }}>{desc}</p>
-    </div>
+      {/* Final CTA */}
+      <section className="shell landing-section">
+        <div className="cta-band">
+          <div>
+            <h2>{t("landing.ctaTitle")}</h2>
+            <p>{t("landing.ctaBody")}</p>
+          </div>
+          <Link href="/sign-up" className="btn btn-accent btn-lg">
+            {t("landing.ctaPrimary")}
+            <ArrowRightIcon size={18} />
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 }

@@ -1,8 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans, JetBrains_Mono } from "next/font/google";
-import { THEME_BOOT_SCRIPT } from "./components/ThemeToggle";
+import { JetBrains_Mono, Noto_Sans } from "next/font/google";
+import { headers } from "next/headers";
+import { getViewerSafe } from "@/server/session";
 import AppShell from "./components/AppShell";
 import { LanguageProvider } from "./lib/i18n/LanguageContext";
+import { getDictionary, getLanguage } from "./lib/i18n/server";
+import { siteUrl } from "./lib/site";
+import { THEME_BOOT_SCRIPT } from "./lib/theme";
 import "./globals.css";
 
 const notoSans = Noto_Sans({
@@ -18,52 +22,81 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+const description =
+  "Identify 38 crop diseases across 14 crops from a leaf photo, estimate severity, and see exactly which parts of the leaf drove the diagnosis. Analysis runs on your device.";
+
 export const metadata: Metadata = {
-  title: "PlantGuard — plant disease detection in your browser",
-  description:
-    "Identify plant diseases, estimate infection severity, and see exactly where the model looked. Runs entirely on your device; photographs are never uploaded.",
+  metadataBase: new URL(siteUrl()),
+  title: {
+    default: "PlantGuard — crop disease detection that shows its work",
+    template: "%s · PlantGuard",
+  },
+  description,
+  applicationName: "PlantGuard",
   keywords: [
     "plant disease detection",
     "crop disease",
+    "leaf disease",
     "severity estimation",
-    "class activation map",
     "explainable AI",
-    "on-device inference",
     "agriculture",
+    "farmers",
   ],
   openGraph: {
-    title: "PlantGuard — plant disease detection in your browser",
-    description:
-      "Identify plant diseases and see exactly where the model looked. Runs entirely on-device.",
     type: "website",
+    siteName: "PlantGuard",
+    title: "PlantGuard — crop disease detection that shows its work",
+    description,
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "PlantGuard",
+    description,
+  },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f8f6" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0f0d" },
+    { media: "(prefers-color-scheme: light)", color: "#fdfdf9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d120f" },
   ],
+  width: "device-width",
+  initialScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const [language, dictionary, requestHeaders, viewer] = await Promise.all([
+    getLanguage(),
+    getDictionary(),
+    headers(),
+    getViewerSafe(),
+  ]);
+  const nonce = requestHeaders.get("x-nonce") ?? undefined;
+
   return (
-    <html lang="en" className={`${notoSans.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang={language}
+      className={`${notoSans.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/* Applies the stored theme before first paint, so there is no flash of
             the wrong palette on load. */}
         <script
+          nonce={nonce}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: build-time constant with no user input, and it must execute before hydration to avoid a flash of the wrong theme.
           dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
         />
       </head>
       <body>
-        <LanguageProvider>
-          <AppShell>
-            {children}
-          </AppShell>
+        <LanguageProvider
+          initialLanguage={language}
+          initialDictionary={dictionary}
+        >
+          <AppShell viewer={viewer}>{children}</AppShell>
         </LanguageProvider>
       </body>
     </html>

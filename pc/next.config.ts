@@ -1,7 +1,42 @@
 import type { NextConfig } from "next";
 
+const isProduction = process.env.NODE_ENV === "production";
+
+/**
+ * Security headers for every response. The Content-Security-Policy is not
+ * here: it carries a per-request nonce, so `src/proxy.ts` sets it.
+ */
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    // The camera is used for leaf capture; nothing else is.
+    value: "camera=(self), microphone=(), geolocation=(), browsing-topics=()",
+  },
+  // Scan photos and everything else here are for this site only.
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  ...(isProduction
+    ? [
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=63072000; includeSubDomains",
+        },
+      ]
+    : []),
+];
+
 const nextConfig: NextConfig = {
+  // A self-contained server bundle in .next/standalone — what the
+  // Dockerfile ships. See scripts/start-standalone.mjs for running it locally.
+  output: "standalone",
+  poweredByHeader: false,
   turbopack: {},
+
+  images: {
+    formats: ["image/avif", "image/webp"],
+  },
 
   async headers() {
     return [
@@ -20,6 +55,7 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+          ...securityHeaders,
         ],
       },
       {

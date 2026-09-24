@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-type Theme = "light" | "dark" | "system";
-
-const STORAGE_KEY = "plantguard-theme";
-const ORDER: Theme[] = ["system", "light", "dark"];
+import { useLanguage } from "../lib/i18n/LanguageContext";
+import type { TranslationKey } from "../lib/i18n/types";
+import {
+  readStoredTheme,
+  setTheme,
+  THEME_EVENT,
+  THEMES,
+  type Theme,
+} from "../lib/theme";
 
 const ICONS: Record<Theme, React.ReactNode> = {
   system: (
@@ -23,56 +27,46 @@ const ICONS: Record<Theme, React.ReactNode> = {
   dark: <path d="M15 10.4A6.3 6.3 0 1 1 7.6 3a5 5 0 0 0 7.4 7.4Z" />,
 };
 
-const LABELS: Record<Theme, string> = {
-  system: "Match system theme",
-  light: "Light theme",
-  dark: "Dark theme",
+export const THEME_LABELS: Record<Theme, TranslationKey> = {
+  system: "theme.system",
+  light: "theme.light",
+  dark: "theme.dark",
 };
 
-export function applyTheme(theme: Theme): void {
-  const root = document.documentElement;
-  if (theme === "system") {
-    root.removeAttribute("data-theme");
-  } else {
-    root.setAttribute("data-theme", theme);
-  }
-}
-
-export default function ThemeToggle() {
-  // Start as `system` on both server and client so the first paint matches the
-  // markup the server sent; the real preference is read in an effect below.
-  const [theme, setTheme] = useState<Theme>("system");
+/** Follows the stored theme and changes made anywhere else on the page. */
+export function useTheme(): [Theme, boolean] {
+  // Start as `system` on both server and client so the first render matches
+  // the server markup; the stored preference is read after mount.
+  const [theme, setLocal] = useState<Theme>("system");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-      if (stored && ORDER.includes(stored)) setTheme(stored);
-    } catch {
-      // Storage can throw in private mode or with site data blocked. The
-      // default is still correct, so there is nothing to recover from.
-    }
+    setLocal(readStoredTheme());
+    const onChange = (event: Event) =>
+      setLocal((event as CustomEvent<Theme>).detail);
+    window.addEventListener(THEME_EVENT, onChange);
+    return () => window.removeEventListener(THEME_EVENT, onChange);
   }, []);
 
-  function cycle() {
-    const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
-    setTheme(next);
-    applyTheme(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Preference simply will not persist; the current session still works.
-    }
-  }
+  return [theme, mounted];
+}
+
+/** One-button theme switch: system → light → dark. */
+export default function ThemeToggle() {
+  const { t } = useLanguage();
+  const [theme, mounted] = useTheme();
+  const label = t(THEME_LABELS[theme]);
 
   return (
     <button
       type="button"
       className="btn btn-ghost btn-icon"
-      onClick={cycle}
-      title={LABELS[theme]}
-      aria-label={`${LABELS[theme]}. Activate to change.`}
+      onClick={() =>
+        setTheme(THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length])
+      }
+      title={label}
+      aria-label={t("theme.toggle", label)}
     >
       <svg
         width="18"
@@ -92,12 +86,24 @@ export default function ThemeToggle() {
   );
 }
 
-/**
- * Runs before first paint to apply the stored theme.
- *
- * Without this the page renders in the default theme and then snaps to the
- * chosen one — a flash of wrong colour on every navigation.
- */
-export const THEME_BOOT_SCRIPT = `(function(){try{var t=localStorage.getItem(${JSON.stringify(
-  STORAGE_KEY,
-)});if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t)}}catch(e){}})();`;
+/** Segmented light / dark / system control for the settings page. */
+export function ThemeSelect() {
+  const { t } = useLanguage();
+  const [theme] = useTheme();
+
+  return (
+    <fieldset className="segmented" style={{ border: 0, margin: 0 }}>
+      <legend className="sr-only">{t("settings.theme")}</legend>
+      {THEMES.map((option) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={theme === option}
+          onClick={() => setTheme(option)}
+        >
+          {t(THEME_LABELS[option])}
+        </button>
+      ))}
+    </fieldset>
+  );
+}

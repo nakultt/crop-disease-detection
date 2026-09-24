@@ -12,6 +12,13 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
+/blob-report/
+
+# development and e2e mail outboxes (MAIL_OUTBOX_DIR)
+/.mail-outbox/
+/.e2e-outbox/
 
 # next.js
 /.next/
@@ -30,8 +37,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — secrets never belong in git. The documented template is the
+# one exception.
 .env*
+!.env.example
 
 # vercel
 .vercel

@@ -1,17 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { ClassScore } from "../lib/inference";
+import { useLanguage } from "../lib/i18n/LanguageContext";
+import { severityColor, severityLabel } from "../lib/severity";
+
+interface SeverityBin {
+  className: string;
+  probability: number;
+}
 
 interface SeverityGaugeProps {
   level: string;
   range: string;
   probability: number;
-  distribution: ClassScore[];
-  /** Severity is meaningless for a healthy leaf; say so instead of drawing a dial. */
+  distribution: SeverityBin[];
+  /** Severity is meaningless for a healthy leaf; say so instead of drawing a scale. */
   healthy: boolean;
 }
 
+/**
+ * Severity as a labelled scale plus the full distribution. The level is always
+ * spelled out, so colour is never the only carrier of meaning.
+ */
 export default function SeverityGauge({
   level,
   range,
@@ -19,27 +28,22 @@ export default function SeverityGauge({
   distribution,
   healthy,
 }: SeverityGaugeProps) {
+  const { t } = useLanguage();
+
   if (healthy) {
     return (
       <section className="card card-pad" aria-labelledby="severity-heading">
-        <h2 id="severity-heading" className="label" style={{ marginBottom: 16 }}>
-          Severity
-        </h2>
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
-            padding: "16px",
-            borderRadius: "var(--radius-md)",
-            background: "var(--mild-soft)",
-            color: "var(--mild)",
-            border: "1px solid color-mix(in srgb, var(--mild) 20%, transparent)",
-          }}
+        <h2
+          id="severity-heading"
+          className="label"
+          style={{ marginBottom: 16 }}
         >
+          {t("sev.title")}
+        </h2>
+        <div className="alert alert-success">
           <svg
-            width="24"
-            height="24"
+            width="22"
+            height="22"
             viewBox="0 0 20 20"
             fill="none"
             stroke="currentColor"
@@ -47,25 +51,25 @@ export default function SeverityGauge({
             strokeLinecap="round"
             strokeLinejoin="round"
             aria-hidden="true"
-            style={{ flex: "none" }}
           >
             <circle cx="10" cy="10" r="7.5" />
             <path d="m6.5 10.2 2.4 2.3 4.6-4.8" />
           </svg>
-          <p style={{ fontSize: 14.5, color: "var(--text)", fontWeight: 500 }}>
-            No disease detected. Plant is healthy.
-          </p>
+          <p style={{ fontSize: 14.5, fontWeight: 500 }}>{t("sev.healthy")}</p>
         </div>
       </section>
     );
   }
 
-  // Find the exact index for a linear progress scale
-  const levels = ["Mild", "Moderate", "Severe", "Critical"];
-  const index = Math.max(0, levels.indexOf(level));
-  // Default to 10% for mild to ensure there is always a visible bar
-  const fraction = Math.max(0.1, index / (levels.length - 1));
-  const pct = fraction * 100;
+  // Position along the scale reflects the whole distribution (its expected
+  // level), not just the arg-max, so a 51/49 split does not look decisive.
+  const expected = distribution.reduce(
+    (sum, bin, i) => sum + i * bin.probability,
+    0,
+  );
+  const fraction =
+    distribution.length > 1 ? expected / (distribution.length - 1) : 0;
+  const pct = Math.max(6, Math.min(100, fraction * 100));
 
   return (
     <section
@@ -74,43 +78,92 @@ export default function SeverityGauge({
       data-severity={level}
     >
       <h2 id="severity-heading" className="label" style={{ marginBottom: 20 }}>
-        Infection severity
+        {t("sev.title")}
       </h2>
 
-      <div style={{ padding: "20px", borderRadius: "var(--radius-xl)", background: "var(--surface-2)", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16 }}>
+      <div
+        style={{
+          padding: 20,
+          borderRadius: "var(--radius-xl)",
+          background: "var(--surface-2)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            gap: 12,
+            flexWrap: "wrap",
+            marginBottom: 16,
+          }}
+        >
+          {/* Level text stays in ink: the moderate/severe hues fall below
+              text contrast on light surfaces. The dot carries the colour. */}
           <div
             style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
               fontSize: 26,
               fontWeight: 700,
               letterSpacing: "-0.015em",
-              color: "var(--sev)",
             }}
           >
-            {level}
+            <span
+              aria-hidden="true"
+              className="dot"
+              style={{ width: 14, height: 14, color: "var(--sev)" }}
+            />
+            {severityLabel(level, t)}
           </div>
           <div className="dim tnum" style={{ fontSize: 13.5, fontWeight: 600 }}>
-            {range} affected
+            {range} {t("sev.affected")} · {(probability * 100).toFixed(0)}%
           </div>
         </div>
-        
-        {/* Visual Scale */}
-        <div style={{ position: "relative", height: 12, borderRadius: "var(--radius-full)", background: "var(--border)", overflow: "hidden", marginBottom: 12 }}>
-          <div style={{ 
-            position: "absolute", 
-            left: 0, 
-            top: 0, 
-            bottom: 0, 
-            width: `${pct}%`, 
-            background: "var(--sev)", 
+
+        {/* biome-ignore lint/a11y/useSemanticElements: a native <meter> cannot take the severity colour ramp or the rounded track across browsers; the ARIA meter role conveys the same value. */}
+        <div
+          role="meter"
+          aria-label={t("sev.title")}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(pct)}
+          aria-valuetext={`${severityLabel(level, t)}, ${range}`}
+          style={{
+            position: "relative",
+            height: 12,
             borderRadius: "var(--radius-full)",
-            transition: "width var(--ease-spring)"
-          }} />
+            background: "var(--border)",
+            overflow: "hidden",
+            marginBottom: 12,
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              inset: "0 auto 0 0",
+              width: `${pct}%`,
+              background: "var(--sev)",
+              borderRadius: "var(--radius-full)",
+              transition: "width var(--ease-spring)",
+            }}
+          />
         </div>
-        
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          <span>Mild</span>
-          <span>Critical</span>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: 12,
+            color: "var(--text-3)",
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+          }}
+        >
+          <span>{t("sev.mild")}</span>
+          <span>{t("sev.critical")}</span>
         </div>
       </div>
 
@@ -120,72 +173,57 @@ export default function SeverityGauge({
           margin: "28px 0 0",
           padding: 0,
           display: "grid",
-          gap: 14,
+          gridTemplateColumns: "max-content minmax(48px, 1fr) auto",
+          gap: "14px 12px",
         }}
       >
-        {distribution.map((bin) => (
-          <li
-            key={bin.className}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "72px 1fr 48px",
-              gap: 12,
-              alignItems: "center",
-            }}
-          >
-            <span
+        {distribution.map((bin) => {
+          const current = bin.className === level;
+          return (
+            <li
+              key={bin.className}
               style={{
-                fontSize: 13.5,
-                fontWeight: bin.className === level ? 660 : 500,
-                color:
-                  bin.className === level
-                    ? severityColor(bin.className)
-                    : "var(--text-2)",
+                display: "grid",
+                gridColumn: "1 / -1",
+                gridTemplateColumns: "subgrid",
+                alignItems: "center",
               }}
             >
-              {bin.className}
-            </span>
-            <span className="meter" style={{ height: 6 }}>
-              <i
+              <span
                 style={{
-                  width: `${bin.probability * 100}%`,
-                  background: severityColor(bin.className),
-                  opacity: bin.className === level ? 1 : 0.3,
+                  fontSize: 13.5,
+                  fontWeight: current ? 700 : 500,
+                  color: current ? "var(--text)" : "var(--text-2)",
                 }}
-              />
-            </span>
-            <span
-              className="tnum dim"
-              style={{ fontSize: 13.5, textAlign: "right", fontWeight: 600 }}
-            >
-              {(bin.probability * 100).toFixed(0)}%
-            </span>
-          </li>
-        ))}
+              >
+                {severityLabel(bin.className, t)}
+              </span>
+              <span className="meter" style={{ height: 6 }}>
+                <i
+                  style={{
+                    width: `${bin.probability * 100}%`,
+                    background: severityColor(bin.className),
+                    opacity: current ? 1 : 0.3,
+                  }}
+                />
+              </span>
+              <span
+                className="tnum dim"
+                style={{ fontSize: 13.5, textAlign: "right", fontWeight: 600 }}
+              >
+                {(bin.probability * 100).toFixed(0)}%
+              </span>
+            </li>
+          );
+        })}
       </ul>
 
       <p
         className="dim"
         style={{ fontSize: 12, marginTop: 24, lineHeight: 1.5 }}
       >
-        Severity labels are derived from colour segmentation, not agronomist
-        annotation. Treat this as an indication, not a measurement.
+        {t("sev.note")}
       </p>
     </section>
   );
-}
-
-function severityColor(level: string): string {
-  switch (level) {
-    case "Mild":
-      return "var(--mild)";
-    case "Moderate":
-      return "var(--moderate)";
-    case "Severe":
-      return "var(--severe)";
-    case "Critical":
-      return "var(--critical)";
-    default:
-      return "var(--text-3)";
-  }
 }

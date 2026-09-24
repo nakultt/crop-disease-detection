@@ -1,38 +1,44 @@
 {
-  "name": "pc",
-  "version": "0.1.0",
+  "name": "plantguard-web",
+  "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:standalone": "node scripts/start-standalone.mjs",
     "lint": "biome check",
     "format": "biome format --write",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "admin:grant": "node scripts/grant-admin.mjs"
   },
   "dependencies": {
-    "next": "16.2.10",
+    "better-auth": "1.7.5",
+    "mongodb": "^7.6.0",
+    "next": "16.3.6",
+    "nodemailer": "^10.0.10",
     "onnxruntime-web": "^1.27.0",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^2.1.9"
-  },
-  "ignoreScripts": [
-    "sharp",
-    "unrs-resolver"
-  ],
-  "trustedDependencies": [
-    "sharp",
-    "unrs-resolver"
-  ]
+    "vite": "^7.3.6",
+    "vitest": "^4.1.11"
+  }
 }
