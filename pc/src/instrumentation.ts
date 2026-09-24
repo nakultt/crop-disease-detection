@@ -22,5 +22,15 @@ export async function register() {
 
   // Not awaited: a database that is still starting should not block the
   // server from coming up. ensureIndexes logs, and retries on next use.
-  ensureIndexes().catch(() => undefined);
+  ensureIndexes().catch(() => {
+    // The commonest first-run problem: no MongoDB. Say how to fix it, without
+    // echoing credentials from the URI.
+    const host = env.MONGODB_URI.replace(
+      /^mongodb(\+srv)?:\/\/([^@/]*@)?/,
+      "",
+    ).split("/")[0];
+    logger.error(
+      `Cannot reach MongoDB at ${host}. Start a local MongoDB (install it, or run \`docker run -d -p 27017:27017 mongo:8\`), or point MONGODB_URI at your database. The app retries on the next request.`,
+    );
+  });
 }

@@ -1,4 +1,7 @@
 import "server-only";
+import { randomBytes } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 import { logger } from "./logger";
 
@@ -6,9 +9,12 @@ import { logger } from "./logger";
  * Server configuration, validated once.
  *
  * Everything the server reads from the environment goes through here, so a
- * missing secret or a malformed URL fails at startup with a message naming the
- * variable — not later as a confusing auth or database error. See
- * `.env.example` for what each variable does.
+ * malformed value fails at startup with a message naming the variable — not
+ * later as a confusing auth or database error. See `.env.example` for what
+ * each variable does.
+ *
+ * Nothing is required: a fresh clone runs against a local MongoDB with no
+ * `.env` file at all. Set the variables before exposing the app publicly.
  */
 
 const list = z
@@ -58,7 +64,8 @@ const schema = z.object({
   EMAIL_FROM: z.string().default("PlantGuard <no-reply@plantguard.local>"),
   MAIL_OUTBOX_DIR: optionalString,
 
-  REQUIRE_EMAIL_VERIFICATION: z.stringbool().default(true),
+  // Off by default so a local install works without an email server.
+  REQUIRE_EMAIL_VERIFICATION: z.stringbool().default(false),
   DISABLE_SIGNUPS: z.stringbool().default(false),
 
   GOOGLE_CLIENT_ID: optionalString,
@@ -79,16 +86,57 @@ const schema = z.object({
 });
 
 export type Env = Omit<z.infer<typeof schema>, "BETTER_AUTH_SECRET"> & {
-  /** Always set: the configured secret, or the development fallback. */
+  /** Always set: the configured secret, or a generated local one. */
   BETTER_AUTH_SECRET: string;
   /** Database name: `MONGODB_DB`, else the URI's path, else `plantguard`. */
   mongoDbName: string;
   emailTransport: "smtp" | "file" | "console";
   isProduction: boolean;
+  /** False when APP_URL is the local default rather than a set value. */
+  appUrlConfigured: boolean;
 };
 
-/** Development-only fallback so a fresh clone runs without any setup. */
-const DEV_SECRET = "plantguard-development-secret-do-not-use-in-production";
+/** Fallback for `parseEnv` callers that don't supply one (tests). */
+const TEST_SECRET = "plantguard-test-secret-not-for-real-use-0123456789";
+
+/**
+ * Where a generated secret is kept: `PLANTGUARD_DATA_DIR` (set by
+ * `npm run start:standalone`, whose server changes directory into the
+ * build output), else `.data/` in the working directory.
+ */
+function localSecretFile(): string {
+  const dir =
+    process.env.PLANTGUARD_DATA_DIR ?? path.join(process.cwd(), ".data");
+  return path.resolve(dir, "auth-secret");
+}
+
+/**
+ * The secret to use when BETTER_AUTH_SECRET is not set: generated once and
+ * saved, so sessions survive restarts. If the file can't be written (a
+ * read-only filesystem), a per-process secret is used and everyone is signed
+ * out on restart.
+ */
+function localSecret(): { secret: string; persisted: boolean } {
+  const file = localSecretFile();
+  try {
+    const saved = readFileSync(file, "utf8").trim();
+    if (saved.length >= 32) return { secret: saved, persisted: true };
+  } catch {
+    // Not created yet.
+  }
+  const secret = randomBytes(32).toString("base64url");
+  try {
+    mkdirSync(path.dirname(file), { recursive: true });
+    // `wx`: if another server process created the file first, use theirs.
+    writeFileSync(file, secret, { mode: 0o600, flag: "wx" });
+    return { secret, persisted: true };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      return { secret: readFileSync(file, "utf8").trim(), persisted: true };
+    }
+    return { secret, persisted: false };
+  }
+}
 
 /** `mongodb://host/dbname?opts` → `dbname`. */
 export function databaseNameFromUri(uri: string): string | undefined {
@@ -97,7 +145,10 @@ export function databaseNameFromUri(uri: string): string | undefined {
   return name || undefined;
 }
 
-export function parseEnv(source: Record<string, string | undefined>): Env {
+export function parseEnv(
+  source: Record<string, string | undefined>,
+  fallbackSecret: string = TEST_SECRET,
+): Env {
   const parsed = schema.safeParse(source);
   if (!parsed.success) {
     const problems = parsed.error.issues
@@ -109,21 +160,6 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
   const env = parsed.data;
   const isProduction = env.NODE_ENV === "production";
 
-  // `next build` runs with NODE_ENV=production but has no business needing
-  // runtime secrets; only enforce them when the server actually starts.
-  const building = source.NEXT_PHASE === "phase-production-build";
-
-  if (isProduction && !building) {
-    const missing = ["BETTER_AUTH_SECRET", "APP_URL", "MONGODB_URI"].filter(
-      (key) => !source[key]?.trim(),
-    );
-    if (missing.length > 0) {
-      throw new Error(
-        `Missing required production configuration: ${missing.join(", ")}. See .env.example.`,
-      );
-    }
-  }
-
   const emailTransport: Env["emailTransport"] =
     env.SMTP_URL || env.SMTP_HOST
       ? "smtp"
@@ -133,11 +169,12 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
 
   return {
     ...env,
-    BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET ?? DEV_SECRET,
+    BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET ?? fallbackSecret,
     mongoDbName:
       env.MONGODB_DB ?? databaseNameFromUri(env.MONGODB_URI) ?? "plantguard",
     emailTransport,
     isProduction,
+    appUrlConfigured: Boolean(source.APP_URL?.trim()),
   };
 }
 
@@ -145,18 +182,31 @@ let cached: Env | null = null;
 
 export function getEnv(): Env {
   if (cached) return cached;
-  cached = parseEnv(process.env);
+  const building = process.env.NEXT_PHASE === "phase-production-build";
+  const configured = Boolean(process.env.BETTER_AUTH_SECRET?.trim());
+  const local = configured || building ? null : localSecret();
+  cached = parseEnv(process.env, local?.secret);
+  if (building) return cached;
 
-  if (cached.BETTER_AUTH_SECRET === DEV_SECRET) {
+  if (local && !local.persisted) {
     logger.warn(
-      "BETTER_AUTH_SECRET is not set; using the development fallback. Set it before deploying.",
+      `Could not save a generated secret to ${localSecretFile()}; sessions will not survive a restart. Set BETTER_AUTH_SECRET.`,
     );
   }
-  const building = process.env.NEXT_PHASE === "phase-production-build";
-  if (cached.isProduction && !building && cached.emailTransport !== "smtp") {
-    logger.warn(
-      `No SMTP server configured: account emails are written to the ${cached.emailTransport === "file" ? "mail outbox directory" : "server log"} instead of being delivered.`,
+  if (cached.isProduction) {
+    const defaults = ["BETTER_AUTH_SECRET", "APP_URL", "MONGODB_URI"].filter(
+      (key) => !process.env[key]?.trim(),
     );
+    if (defaults.length > 0) {
+      logger.warn(
+        `Running with default ${defaults.join(", ")}. Fine for a local install; set them before exposing the app publicly (see .env.example).`,
+      );
+    }
+    if (cached.emailTransport !== "smtp") {
+      logger.warn(
+        `No SMTP server configured: account emails are written to the ${cached.emailTransport === "file" ? "mail outbox directory" : "server log"} instead of being delivered.`,
+      );
+    }
   }
   return cached;
 }

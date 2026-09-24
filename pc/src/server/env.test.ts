@@ -7,23 +7,23 @@ describe("parseEnv", () => {
     expect(env.APP_URL).toBe("http://localhost:3000");
     expect(env.mongoDbName).toBe("plantguard");
     expect(env.emailTransport).toBe("console");
-    expect(env.REQUIRE_EMAIL_VERIFICATION).toBe(true);
+    expect(env.REQUIRE_EMAIL_VERIFICATION).toBe(false);
     expect(env.BETTER_AUTH_SECRET.length).toBeGreaterThanOrEqual(32);
   });
 
-  it("refuses to start in production without its secrets", () => {
-    expect(() => parseEnv({ NODE_ENV: "production" })).toThrow(
-      /BETTER_AUTH_SECRET/,
-    );
+  it("runs a production build with no configuration, on local defaults", () => {
+    const env = parseEnv({ NODE_ENV: "production" }, "g".repeat(43));
+    expect(env.isProduction).toBe(true);
+    expect(env.BETTER_AUTH_SECRET).toBe("g".repeat(43));
+    expect(env.MONGODB_URI).toBe("mongodb://127.0.0.1:27017/plantguard");
   });
 
-  it("does not demand runtime secrets during `next build`", () => {
-    expect(() =>
-      parseEnv({
-        NODE_ENV: "production",
-        NEXT_PHASE: "phase-production-build",
-      }),
-    ).not.toThrow();
+  it("prefers a configured secret over the generated one", () => {
+    const env = parseEnv(
+      { BETTER_AUTH_SECRET: "c".repeat(40) },
+      "g".repeat(43),
+    );
+    expect(env.BETTER_AUTH_SECRET).toBe("c".repeat(40));
   });
 
   it("accepts a complete production configuration", () => {

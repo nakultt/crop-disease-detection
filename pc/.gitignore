@@ -18,6 +18,8 @@
 
 # development and e2e mail outboxes (MAIL_OUTBOX_DIR)
 /.mail-outbox/
+# Generated auth secret (see src/server/env.ts)
+/.data/
 /.e2e-outbox/
 
 # next.js

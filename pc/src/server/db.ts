@@ -29,6 +29,13 @@ export function getMongo(): MongoHandle {
       maxPoolSize: 20,
       serverSelectionTimeoutMS: 8000,
     });
+    // A client whose first connection fails (MongoDB not started yet) is
+    // closed for good; forget it so the next request starts a fresh one.
+    client.once("topologyClosed", () => {
+      if (globalForMongo.__plantguardMongo?.client === client) {
+        globalForMongo.__plantguardMongo = undefined;
+      }
+    });
     globalForMongo.__plantguardMongo = {
       client,
       db: client.db(env.mongoDbName),
@@ -59,13 +66,10 @@ export const COLLECTIONS = {
  * fails every write, so detect rather than assume.
  */
 export async function supportsTransactions(): Promise<boolean> {
-  try {
-    const hello = await getDb().admin().command({ hello: 1 });
-    return Boolean(hello.setName) || hello.msg === "isdbgrid";
-  } catch (error) {
-    logger.warn("Could not determine MongoDB topology", { err: error });
-    return false;
-  }
+  // Throws when the database is unreachable, so callers don't cache a setup
+  // built on a connection that never came up.
+  const hello = await getDb().admin().command({ hello: 1 });
+  return Boolean(hello.setName) || hello.msg === "isdbgrid";
 }
 
 async function createIndexes(): Promise<void> {

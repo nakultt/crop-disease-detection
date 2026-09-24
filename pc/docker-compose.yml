@@ -1,22 +1,28 @@
-# PlantGuard on one machine: the web app, MongoDB, and (for trying it out)
-# Mailpit to catch account emails.
+# PlantGuard on one machine: the web app, MongoDB, and Mailpit to catch
+# account emails (password resets, and verification if you turn it on).
 #
-#   cp .env.example .env.production
-#   # set BETTER_AUTH_SECRET and APP_URL; to try it out with Mailpit, also
-#   # set SMTP_HOST=mailpit and SMTP_PORT=1025
 #   docker compose up -d --build
 #
-# The app is on http://localhost:3000 and caught emails on
-# http://localhost:8025. For a real deployment, point SMTP_* at your mail
-# provider, remove the mailpit service, and put a TLS-terminating proxy in
-# front of port 3000.
+# No configuration needed: the app is on http://localhost:3000 and caught
+# emails on http://localhost:8025. To customise, create .env.production from
+# .env.example; it is picked up automatically. For a public deployment set
+# APP_URL and BETTER_AUTH_SECRET, point SMTP_* at your mail provider, and put
+# a TLS-terminating proxy in front of port 3000.
 
 services:
   web:
     build: .
-    env_file: .env.production
+    env_file:
+      - path: .env.production
+        required: false
     environment:
       MONGODB_URI: mongodb://mongo:27017/plantguard
+      # Mailpit unless SMTP_HOST/SMTP_PORT are set in your shell or in a
+      # `.env` file next to this one (compose reads those, not .env.production).
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+    volumes:
+      - app-data:/app/.data
     ports:
       - "3000:3000"
     depends_on:
@@ -51,3 +57,4 @@ services:
 
 volumes:
   mongo-data:
+  app-data:

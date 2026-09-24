@@ -49,16 +49,17 @@ function createAuth(env: Env, transactions: boolean) {
 
   return betterAuth({
     appName: APP_NAME,
-    // In development accept any localhost port, so `next dev` on 3000 and a
-    // preview on another port both work without editing APP_URL. Production
-    // is pinned to exactly one origin.
-    baseURL: env.isProduction
-      ? env.APP_URL
-      : {
-          allowedHosts: ["localhost:*", "127.0.0.1:*"],
-          fallback: env.APP_URL,
-          protocol: "http",
-        },
+    // Accept any localhost port unless a public APP_URL is configured, so a
+    // local install works on whatever port it runs. A configured production
+    // deployment is pinned to exactly one origin.
+    baseURL:
+      env.isProduction && env.appUrlConfigured
+        ? env.APP_URL
+        : {
+            allowedHosts: ["localhost:*", "127.0.0.1:*"],
+            fallback: env.APP_URL,
+            protocol: "http",
+          },
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: env.TRUSTED_ORIGINS,
     database: mongodbAdapter(
@@ -88,10 +89,11 @@ function createAuth(env: Env, transactions: boolean) {
     },
 
     emailVerification: {
-      sendOnSignUp: true,
+      // With verification off (the local default), sign-up needs no email.
+      sendOnSignUp: env.REQUIRE_EMAIL_VERIFICATION,
       // An unverified user who tries to sign in gets a fresh link, rather
       // than being stuck with one that has expired.
-      sendOnSignIn: true,
+      sendOnSignIn: env.REQUIRE_EMAIL_VERIFICATION,
       autoSignInAfterVerification: true,
       expiresIn: 60 * 60 * 24,
       sendVerificationEmail: async ({ user, url }) => {
@@ -191,11 +193,12 @@ function createAuth(env: Env, transactions: boolean) {
     databaseHooks: {
       user: {
         create: {
-          // OAuth sign-ups arrive with a verified address, so the admin
+          // OAuth sign-ups arrive with a verified address, and without
+          // required verification nobody is waiting on one, so the admin
           // allow-list can apply immediately; see afterEmailVerification.
           before: async (user) => {
             if (
-              user.emailVerified &&
+              (user.emailVerified || !env.REQUIRE_EMAIL_VERIFICATION) &&
               env.ADMIN_EMAILS.includes(user.email.toLowerCase())
             ) {
               return { data: { ...user, role: "admin" } };
@@ -231,6 +234,8 @@ export type AuthSession = Auth["$Infer"]["Session"];
 export type AuthUser = AuthSession["user"];
 
 let authPromise: Promise<Auth> | null = null;
+/** The Mongo client the cached auth instance was built on. */
+let authClient: unknown = null;
 
 /**
  * The Better Auth instance, built on first use.
@@ -240,6 +245,12 @@ let authPromise: Promise<Auth> | null = null;
  * so a database that was down at first use gets retried.
  */
 export function getAuth(): Promise<Auth> {
+  // Rebuild if the database client was replaced after a failed connection.
+  const { client } = getMongo();
+  if (authClient !== client) {
+    authPromise = null;
+    authClient = client;
+  }
   authPromise ??= (async () => {
     const env = getEnv();
     const transactions = await supportsTransactions();

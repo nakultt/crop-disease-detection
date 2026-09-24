@@ -143,29 +143,35 @@ or a training run to start.
 
 ### Web app
 
-Needs **Node 20.9+** and a **MongoDB** (local `mongod`, Docker, or Atlas).
+Needs **Node 20.9+** and **MongoDB running locally** on the default port
+(`mongodb://127.0.0.1:27017`). No `.env` file or other setup:
 
 ```bash
 cd pc
-cp .env.example .env.local     # defaults work against a local MongoDB
 npm install
 npm run dev                    # http://localhost:3000
 ```
 
-Sign up. Without SMTP configured, the verification email is printed to the
-server log, or saved as a JSON file in `MAIL_OUTBOX_DIR` if you set it. Open
-the link, then scan a leaf. To make yourself an admin:
+Sign up and you're in. Email verification is off by default, and the app
+generates its own session secret in `pc/.data/`. Don't have MongoDB? Start one
+with Docker:
+
+```bash
+docker run -d --name plantguard-mongo -p 27017:27017 mongo:8
+```
+
+Password-reset emails are printed to the server log when no SMTP server is
+configured. To make yourself an admin:
 
 ```bash
 npm run admin:grant -- you@example.com
 ```
 
-Or run everything in containers (app + MongoDB + Mailpit):
+Or run the whole stack in containers (app + MongoDB + Mailpit), again with no
+configuration:
 
 ```bash
 cd pc
-cp .env.example .env.production   # set BETTER_AUTH_SECRET, APP_URL,
-                                  # SMTP_HOST=mailpit, SMTP_PORT=1025
 docker compose up -d --build      # app :3000, caught emails :8025
 ```
 
@@ -282,18 +288,22 @@ important ones:
 
 | Variable | Purpose |
 | --- | --- |
-| `APP_URL` | Public URL, used for email links, OAuth callbacks and origin checks. **Required in production.** |
-| `BETTER_AUTH_SECRET` | 32+ random characters that sign sessions. **Required in production.** |
-| `MONGODB_URI` | MongoDB connection string. **Required in production.** |
+| `APP_URL` | Public URL, used for email links, OAuth callbacks and origin checks. Default `http://localhost:3000`. |
+| `BETTER_AUTH_SECRET` | 32+ random characters that sign sessions. Generated and saved to `.data/` if unset. |
+| `MONGODB_URI` | MongoDB connection string. Default `mongodb://127.0.0.1:27017/plantguard`. |
 | `SMTP_URL` or `SMTP_HOST`/`PORT`/`USER`/`PASSWORD`, `EMAIL_FROM` | Delivery of account emails |
-| `REQUIRE_EMAIL_VERIFICATION`, `DISABLE_SIGNUPS` | Sign-up policy |
+| `REQUIRE_EMAIL_VERIFICATION` | Off by default; turn on (with SMTP) before going public |
+| `DISABLE_SIGNUPS` | Close public sign-up |
 | `GOOGLE_CLIENT_ID`/`SECRET`, `GITHUB_CLIENT_ID`/`SECRET` | Optional social sign-in |
 | `ADMIN_EMAILS` | Accounts promoted to admin once verified |
 | `MAX_SCANS_PER_USER`, `SCAN_UPLOADS_PER_MINUTE` | Per-user limits |
 | `COMPANY_NAME`, `SUPPORT_EMAIL` | Shown in the footer and legal pages |
 
-The server refuses to start in production when a required value is missing,
-rather than running with an insecure default.
+**Nothing is required.** Every setting has a local default, so a fresh clone
+runs as-is. Before exposing the app publicly, set `APP_URL` and
+`BETTER_AUTH_SECRET`, configure SMTP and turn on `REQUIRE_EMAIL_VERIFICATION`.
+The server logs a warning at startup while it runs on defaults in production
+mode.
 
 ## Deployment
 
@@ -312,7 +322,7 @@ with a persistent volume, so account changes use transactions) and Mailpit.
 **Without Docker:**
 
 ```bash
-cd pc && npm ci && npm run build && npm run start:standalone
+cd pc && npm ci && npm run build && npm start
 ```
 
 **Production checklist:**

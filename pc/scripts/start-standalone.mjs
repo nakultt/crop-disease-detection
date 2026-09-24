@@ -4,7 +4,7 @@
  * self-contained server in .next/standalone, with the static assets and
  * public/ copied next to it (Next leaves those for a CDN by default).
  *
- *   npm run build && npm run start:standalone
+ *   npm run build && npm start
  *
  * Environment variables are passed through; PORT defaults to 3000.
  */
@@ -34,7 +34,14 @@ cpSync(
 
 const child = spawn(process.execPath, [server], {
   stdio: "inherit",
-  env: { ...process.env, NODE_ENV: "production" },
+  env: {
+    ...process.env,
+    NODE_ENV: "production",
+    // The server changes directory into .next/standalone, which a rebuild
+    // replaces; keep the generated auth secret next to the project instead.
+    PLANTGUARD_DATA_DIR:
+      process.env.PLANTGUARD_DATA_DIR ?? path.join(root, ".data"),
+  },
 });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {

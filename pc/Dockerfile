@@ -1,7 +1,7 @@
 # PlantGuard web — production image.
 #
 #   docker build -t plantguard-web .
-#   docker run -p 3000:3000 --env-file .env.production plantguard-web
+#   docker run -p 3000:3000 plantguard-web     # optional: --env-file .env.production
 #
 # Multi-stage: dependencies and the build happen in throwaway stages; the
 # final image holds only Next's self-contained server, static assets and the
@@ -29,11 +29,14 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 
-RUN addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs nextjs
+RUN addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs nextjs  && mkdir -p /app/.data && chown nextjs:nodejs /app/.data
 
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public ./public
+
+# Holds the generated auth secret when BETTER_AUTH_SECRET is not set.
+VOLUME ["/app/.data"]
 
 USER nextjs
 EXPOSE 3000

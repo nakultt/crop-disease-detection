@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/start-standalone.mjs",
     "start:standalone": "node scripts/start-standalone.mjs",
     "lint": "biome check",
     "format": "biome format --write",
