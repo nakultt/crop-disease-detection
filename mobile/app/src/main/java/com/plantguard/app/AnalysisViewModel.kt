@@ -65,6 +65,13 @@ class AnalysisViewModel(application: Application) : AndroidViewModel(application
     /** The square model input, kept so the overlay can be re-rendered cheaply. */
     private var modelInput: Bitmap? = null
 
+    /**
+     * An image that arrived before the model finished loading. After process
+     * death the camera result is delivered as soon as the activity is
+     * recreated, while the model is still being built.
+     */
+    private var pendingUri: Uri? = null
+
     init {
         viewModelScope.launch {
             try {
@@ -73,13 +80,19 @@ class AnalysisViewModel(application: Application) : AndroidViewModel(application
                 }
                 classifier = loaded
                 _modelState.value = ModelState(loading = false, manifest = loaded.manifest)
+                pendingUri?.let {
+                    pendingUri = null
+                    analyse(it)
+                }
             } catch (e: ModelUnavailableException) {
+                dropPending()
                 _modelState.value = ModelState(
                     loading = false,
                     errorMessage = e.message,
                     errorHint = e.hint,
                 )
             } catch (e: Exception) {
+                dropPending()
                 _modelState.value = ModelState(
                     loading = false,
                     errorMessage = e.message ?: "The model could not be loaded.",
@@ -90,7 +103,14 @@ class AnalysisViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun analyse(uri: Uri) {
-        val engine = classifier ?: return
+        val engine = classifier
+        if (engine == null) {
+            if (_modelState.value.loading) {
+                pendingUri = uri
+                _viewState.update { it.copy(analysing = true, errorMessage = null) }
+            }
+            return
+        }
         _viewState.update { it.copy(analysing = true, errorMessage = null) }
 
         viewModelScope.launch {
@@ -194,6 +214,12 @@ class AnalysisViewModel(application: Application) : AndroidViewModel(application
                 )
             }
         }
+    }
+
+    private fun dropPending() {
+        if (pendingUri == null) return
+        pendingUri = null
+        _viewState.update { it.copy(analysing = false) }
     }
 
     fun reset() {

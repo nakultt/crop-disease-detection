@@ -42,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -231,7 +232,7 @@ fun ModelStatusCard(
 
 @Composable
 private fun Fact(label: String, value: String) {
-    Column(modifier = Modifier.width(intrinsicSize = androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+    Column(modifier = Modifier.width(intrinsicSize = androidx.compose.foundation.layout.IntrinsicSize.Max)) {
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
@@ -260,7 +261,9 @@ fun ImageIntake(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri -> uri?.let(onImagePicked) }
 
-    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    // Saveable: the camera app can outlive our process, and the result must
+    // still find the file it was told to write.
+    var pendingCameraUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture(),
     ) { success -> if (success) pendingCameraUri?.let(onImagePicked) }
