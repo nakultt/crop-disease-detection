@@ -138,50 +138,90 @@ a user chooses to save.
 
 ## Quick start
 
-The trained model is committed, so neither app needs a GPU, the 2 GB dataset
-or a training run to start.
+The trained model is committed (`pc/public/models/` and
+`mobile/app/src/main/assets/`, one identical file), so neither app needs a GPU,
+the 2 GB dataset or a training run to start.
 
-### Web app
+### Android app: install the APK
 
-Needs **Node 20.9+** and **MongoDB running locally** on the default port
-(`mongodb://127.0.0.1:27017`). No `.env` file or other setup:
+1. On your phone, download **PlantGuard-v1.0.apk** from the
+   [latest release](https://github.com/nakultt/crop-disease-detection/releases/latest)
+   (it is also committed at [`releases/PlantGuard-v1.0.apk`](releases/PlantGuard-v1.0.apk)).
+2. Open it. Android asks once to allow installs from your browser or file
+   manager; allow it, then tap **Install**.
+3. Open PlantGuard, tap **Gallery** or **Camera**, and pick a leaf.
+
+The app works fully offline. It needs Android 8.0 or newer on an ARM phone
+(every mainstream phone). If an older debug build is already installed, uninstall
+it first: the release is signed with a different key.
+
+To build it yourself instead, open `mobile/` in Android Studio and press Run, or:
+
+```bash
+cd mobile && ./gradlew installDebug
+```
+
+### Web app: run it on your computer
+
+**1. Install the prerequisites (once)**
+
+- **Node.js 20.9 or newer**: <https://nodejs.org> (the LTS installer).
+- **MongoDB Community Server**: <https://www.mongodb.com/try/download/community>.
+  On Windows, keep the installer's default *Install MongoD as a Service*; it
+  then starts with Windows on `127.0.0.1:27017`, which is all the app needs.
+  Or, with Docker: `docker run -d --name plantguard-mongo -p 27017:27017 mongo:8`.
+
+**2. Install and start the app**
 
 ```bash
 cd pc
 npm install
-npm run dev                    # http://localhost:3000
+npm run dev
 ```
 
-Sign up and you're in. Email verification is off by default, and the app
-generates its own session secret in `pc/.data/`. Don't have MongoDB? Start one
-with Docker:
+Open <http://localhost:3000>. There is no `.env` file or other setup: the app
+creates its own session secret in `pc/.data/`.
+
+**3. Use it**
+
+1. Click **Get started**, create an account (email verification is off by
+   default), and you land on the dashboard.
+2. Open **Scan Crop**, upload a leaf photo, and the diagnosis, heatmap,
+   severity and treatment appear in about a second. The scan is saved to
+   **History**.
+3. Ready-made test photos are in [`demo-images/`](demo-images): 20 leaves,
+   each named after the result the app gives for it.
+
+**Run the production build** (faster, what you would deploy):
 
 ```bash
-docker run -d --name plantguard-mongo -p 27017:27017 mongo:8
+cd pc
+npm run build
+npm start                      # http://localhost:3000
 ```
 
-Password-reset emails are printed to the server log when no SMTP server is
-configured. To make yourself an admin:
-
-```bash
-npm run admin:grant -- you@example.com
-```
-
-Or run the whole stack in containers (app + MongoDB + Mailpit), again with no
-configuration:
+**Everything in Docker** (app + MongoDB + Mailpit, still no configuration):
 
 ```bash
 cd pc
 docker compose up -d --build      # app :3000, caught emails :8025
 ```
 
-### Android app
+**Extras**
 
-Open `mobile/` in Android Studio and run, or:
+- Password-reset emails are printed to the server log when no SMTP server is
+  configured.
+- Make yourself an admin: `npm run admin:grant -- you@example.com`.
+- Port 3000 taken? `npm run dev -- --port 3001`.
 
-```bash
-cd mobile && ./gradlew installDebug
-```
+**Troubleshooting**
+
+| Symptom | Fix |
+| --- | --- |
+| `MongoServerSelectionError` / `ECONNREFUSED 127.0.0.1:27017` | MongoDB isn't running. Windows: start the *MongoDB* service in `services.msc`. Docker: `docker start plantguard-mongo`. |
+| "Preparing the model" never finishes | Hard-refresh the page (Ctrl+F5). The 9.7 MB model downloads once and is cached. |
+| `npm install` fails | Check `node -v` is 20.9 or newer. |
+| `npm start` says no standalone build | Run `npm run build` first. |
 
 ### Train your own model
 

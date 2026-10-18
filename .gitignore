@@ -44,3 +44,6 @@ local.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# Local demo login used to take report screenshots
+report-screenshots/demo-account.txt

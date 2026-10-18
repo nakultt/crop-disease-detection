@@ -10,16 +10,35 @@ Android; photographs never leave the phone.
 
 Or open this directory in Android Studio and hit Run.
 
-The app needs `model.onnx` and `model.json` in `app/src/main/assets/`. Produce
-them from `training/`:
+The model (`model.onnx` and `model.json` in `app/src/main/assets/`) is
+committed, byte-identical to the web app's copy, so a fresh clone builds and
+runs as is. After retraining, `uv run python main.py export --verify` in
+`training/` publishes the new model to both apps. If the files are ever
+missing, the app shows a setup message naming that command rather than
+crashing.
+
+### Release APK
+
+A ready-to-install, signed APK is in the
+[GitHub releases](https://github.com/nakultt/crop-disease-detection/releases/latest)
+and at `../releases/PlantGuard-v1.0.apk`. To build one yourself:
 
 ```bash
-cd ../training && uv run python main.py export --demo
+./gradlew assembleRelease   # app/build/outputs/apk/release/
 ```
 
-They are gitignored, so a fresh clone needs this before the app will do
-anything. Without them the app shows a setup message naming the exact command
-rather than crashing.
+Signing reads `mobile/keystore.properties` (git-ignored):
+
+```properties
+storeFile=C:/Users/you/.android/plantguard-release.jks
+storePassword=...
+keyAlias=plantguard
+keyPassword=...
+```
+
+Without that file the release APK is built unsigned. Release builds include
+only the ARM ONNX Runtime libraries (`arm64-v8a`, `armeabi-v7a`), which halves
+the APK to about 41 MB; emulators use the debug build.
 
 - **minSdk 26** (Android 8.0) — reaches essentially every device in use. The
   project template shipped with minSdk 35, which restricted it to Android 15+.

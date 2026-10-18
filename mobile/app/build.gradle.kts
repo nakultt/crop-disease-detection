@@ -1,6 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+}
+
+// Release signing keys live outside git, in mobile/keystore.properties
+// (storeFile, storePassword, keyAlias, keyPassword). Without that file the
+// release build is produced unsigned, as before.
+val keystoreProps = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
 }
 
 android {
@@ -24,8 +34,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (keystoreProps.getProperty("storeFile") != null) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
+            // Phones are ARM. The x86 builds of ONNX Runtime (40 MB of the
+            // APK) only serve emulators, which use the debug build.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
             // AGP 9's `optimization { enable = true }` needs the
             // android.r8.gradual.support flag; the stable path is the classic
             // minify/shrink pair, which still runs R8.
